@@ -1,0 +1,71 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datasets (too large for git)
+datasets/
+dataset_cani_coco/
+labeling_data/
+
+# Images (except docs)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+!docs/**/*.png
+!frontend/**/*.png
+!frontend/**/*.jpg
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+.next/
+.nuxt/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Training artifacts
+runs/
+wandb/
+mlruns/
+lightning_logs/
+
+# Temporary
+*.tmp
+*.temp
+*.log
+
+# LaTeX temp files
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
