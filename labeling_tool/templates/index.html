@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - ResQPet Labeling{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-camera-video"></i> ResQPet Labeling Tool</h1>
+        <p class="lead">Model-Assisted Labeling per espandere il dataset collar</p>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card bg-light">
+            <div class="card-body">
+                <h2>{{ stats.total }}</h2>
+                <p class="text-muted mb-0">Immagini Totali</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card bg-info text-white">
+            <div class="card-body">
+                <h2>{{ stats.prelabeled }}</h2>
+                <p class="mb-0">Pre-labeled</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card bg-success text-white">
+            <div class="card-body">
+                <h2>{{ stats.verified }}</h2>
+                <p class="mb-0">Verificate</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card bg-warning">
+            <div class="card-body">
+                <h2>{{ "%.1f"|format(stats.progress_pct) }}%</h2>
+                <p class="mb-0">Progresso</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="progress" style="height: 25px;">
+            <div class="progress-bar bg-success" role="progressbar"
+                 style="width: {{ stats.progress_pct }}%"
+                 aria-valuenow="{{ stats.progress_pct }}" aria-valuemin="0" aria-valuemax="100">
+                {{ stats.verified }} / {{ stats.total }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-tag fs-1 text-primary mb-3"></i>
+                <h5 class="card-title">Inizia Labeling</h5>
+                <p class="card-text">Verifica le predizioni del modello</p>
+                <a href="{{ url_for('labeling.labeling_workspace') }}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-play-fill"></i> Inizia
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-search fs-1 text-info mb-3"></i>
+                <h5 class="card-title">Rivedi Labels</h5>
+                <p class="card-text">Controlla le immagini già etichettate</p>
+                <a href="{{ url_for('labeling.review_labels') }}" class="btn btn-info btn-lg">
+                    <i class="bi bi-eye"></i> Rivedi
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up fs-1 text-success mb-3"></i>
+                <h5 class="card-title">Statistiche</h5>
+                <p class="card-text">Visualizza statistiche ed esporta</p>
+                <a href="{{ url_for('dashboard.statistics') }}" class="btn btn-success btn-lg">
+                    <i class="bi bi-bar-chart"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Instructions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Come Funziona
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li><strong>Pre-labeling:</strong> Il modello collar detector analizza tutte le immagini</li>
+                    <li><strong>Verifica:</strong> Tu verifichi/correggi le predizioni (keyboard shortcuts per velocità)</li>
+                    <li><strong>Export:</strong> Esporta in formato YOLO per retraining</li>
+                </ol>
+                <h6>Keyboard Shortcuts:</h6>
+                <ul class="list-inline">
+                    <li class="list-inline-item"><kbd>1</kbd> Con Collare</li>
+                    <li class="list-inline-item"><kbd>2</kbd> Senza Collare</li>
+                    <li class="list-inline-item"><kbd>U</kbd> Unclear</li>
+                    <li class="list-inline-item"><kbd>N</kbd> No Dog</li>
+                    <li class="list-inline-item"><kbd>Space</kbd> Accetta</li>
+                    <li class="list-inline-item"><kbd>S</kbd> Salta</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

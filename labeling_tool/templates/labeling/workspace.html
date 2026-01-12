@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+
+{% block title %}Label Images - ResQPet{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Filters sidebar -->
+    <div class="col-md-2">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-funnel"></i> Filtri</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Dataset</label>
+                    <select id="dataset-filter" class="form-select form-select-sm">
+                        <option value="">Tutti</option>
+                        {% for ds in datasets %}
+                        <option value="{{ ds.name }}">{{ ds.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Max Confidence</label>
+                    <input type="range" id="confidence-filter" class="form-range"
+                           min="0" max="1" step="0.1" value="1">
+                    <small class="text-muted">≤ <span id="confidence-value">1.0</span></small>
+                </div>
+                <button id="apply-filters" class="btn btn-sm btn-outline-primary w-100">
+                    Applica
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><i class="bi bi-keyboard"></i> Shortcuts</div>
+            <div class="card-body small">
+                <p class="mb-1"><kbd>1</kbd> Con Collare</p>
+                <p class="mb-1"><kbd>2</kbd> Senza Collare</p>
+                <p class="mb-1"><kbd>U</kbd> Unclear</p>
+                <p class="mb-1"><kbd>N</kbd> No Dog</p>
+                <hr>
+                <p class="mb-1"><kbd>Space</kbd> Accetta</p>
+                <p class="mb-0"><kbd>S</kbd> Salta</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main labeling area -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span id="image-info">Caricamento...</span>
+                <span class="badge bg-secondary" id="remaining-badge">-</span>
+            </div>
+            <div class="card-body text-center" style="min-height: 400px;">
+                <div id="loading-spinner" class="py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Caricamento immagine...</p>
+                </div>
+                <img id="current-image" src="" class="img-fluid labeling-image d-none"
+                     style="max-height: 450px;">
+                <div id="no-images" class="py-5 d-none">
+                    <i class="bi bi-check-circle fs-1 text-success"></i>
+                    <h4 class="mt-3">Nessuna immagine da etichettare!</h4>
+                    <p>Tutte le immagini sono state verificate.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prediction display -->
+        <div class="card mt-3">
+            <div class="card-header"><i class="bi bi-robot"></i> Predizione Modello</div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col">
+                        <small class="text-muted">Predizione</small>
+                        <div id="prediction-label" class="fs-5 fw-bold">-</div>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted">Confidence</small>
+                        <div id="prediction-confidence" class="fs-5">-</div>
+                        <div class="progress confidence-bar mt-1">
+                            <div id="confidence-bar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted">P(no collar)</small>
+                        <div id="prediction-p-no-collar" class="fs-5">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Label buttons -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <button class="btn btn-success btn-lg label-btn" data-label="0" disabled>
+                        <kbd>1</kbd> Con Collare
+                    </button>
+                    <button class="btn btn-danger btn-lg label-btn" data-label="1" disabled>
+                        <kbd>2</kbd> Senza Collare
+                    </button>
+                    <button class="btn btn-warning btn-lg label-btn" data-label="-1" disabled>
+                        <kbd>U</kbd> Unclear
+                    </button>
+                    <button class="btn btn-secondary btn-lg label-btn" data-label="-2" disabled>
+                        <kbd>N</kbd> No Dog
+                    </button>
+                </div>
+                <div class="d-flex justify-content-center gap-2 mt-3">
+                    <button class="btn btn-primary btn-lg" id="accept-btn" disabled>
+                        <kbd>Space</kbd> Accetta Predizione
+                    </button>
+                    <button class="btn btn-outline-secondary btn-lg" id="skip-btn" disabled>
+                        <kbd>S</kbd> Salta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session stats sidebar -->
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-activity"></i> Sessione</div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">Etichettate</small>
+                    <div class="fs-4 text-success" id="session-labeled">0</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Corrette</small>
+                    <div class="fs-4 text-warning" id="session-corrected">0</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Saltate</small>
+                    <div class="fs-4 text-muted" id="session-skipped">0</div>
+                </div>
+                <hr>
+                <div>
+                    <small class="text-muted">Velocità</small>
+                    <div class="fs-5" id="session-speed">- img/min</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><i class="bi bi-info-circle"></i> Info</div>
+            <div class="card-body small">
+                <p id="info-dataset" class="mb-1">-</p>
+                <p id="info-filename" class="mb-1 text-truncate" title="">-</p>
+                <p id="info-size" class="mb-0">-</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// State
+let currentImage = null;
+let sessionStats = { labeled: 0, corrected: 0, skipped: 0, startTime: Date.now() };
+
+// DOM elements
+const imageEl = document.getElementById('current-image');
+const loadingEl = document.getElementById('loading-spinner');
+const noImagesEl = document.getElementById('no-images');
+const labelBtns = document.querySelectorAll('.label-btn');
+const acceptBtn = document.getElementById('accept-btn');
+const skipBtn = document.getElementById('skip-btn');
+
+// Load next image
+async function loadNextImage() {
+    showLoading();
+
+    const dataset = document.getElementById('dataset-filter').value;
+    const confidence = document.getElementById('confidence-filter').value;
+
+    const params = new URLSearchParams();
+    if (dataset) params.set('dataset', dataset);
+    if (confidence < 1) params.set('confidence_max', confidence);
+
+    try {
+        const response = await fetch(`/api/next?${params}`);
+
+        if (response.status === 204) {
+            showNoImages();
+            return;
+        }
+
+        currentImage = await response.json();
+        displayImage(currentImage);
+        enableButtons();
+
+    } catch (err) {
+        console.error('Error loading image:', err);
+        showNoImages();
+    }
+}
+
+function showLoading() {
+    loadingEl.classList.remove('d-none');
+    imageEl.classList.add('d-none');
+    noImagesEl.classList.add('d-none');
+    disableButtons();
+}
+
+function showNoImages() {
+    loadingEl.classList.add('d-none');
+    imageEl.classList.add('d-none');
+    noImagesEl.classList.remove('d-none');
+    disableButtons();
+}
+
+function displayImage(img) {
+    loadingEl.classList.add('d-none');
+    noImagesEl.classList.add('d-none');
+    imageEl.classList.remove('d-none');
+
+    imageEl.src = img.url;
+    document.getElementById('image-info').textContent = `#${img.id}`;
+
+    // Update prediction display
+    const predLabel = document.getElementById('prediction-label');
+    if (img.prediction === 'WITH_COLLAR') {
+        predLabel.textContent = 'CON COLLARE';
+        predLabel.className = 'fs-5 fw-bold text-success';
+    } else if (img.prediction === 'WITHOUT_COLLAR') {
+        predLabel.textContent = 'SENZA COLLARE';
+        predLabel.className = 'fs-5 fw-bold text-danger';
+    } else {
+        predLabel.textContent = img.prediction || '-';
+        predLabel.className = 'fs-5 fw-bold';
+    }
+
+    const conf = img.confidence || 0;
+    document.getElementById('prediction-confidence').textContent = (conf * 100).toFixed(0) + '%';
+    document.getElementById('confidence-bar').style.width = (conf * 100) + '%';
+
+    const pNoCollar = img.p_no_collar;
+    document.getElementById('prediction-p-no-collar').textContent =
+        pNoCollar !== null ? pNoCollar.toFixed(2) : '-';
+
+    // Update info
+    document.getElementById('info-dataset').textContent = img.dataset;
+    document.getElementById('info-filename').textContent = img.filename;
+    document.getElementById('info-filename').title = img.filename;
+    document.getElementById('info-size').textContent = `${img.width} x ${img.height}`;
+}
+
+function enableButtons() {
+    labelBtns.forEach(btn => btn.disabled = false);
+    acceptBtn.disabled = false;
+    skipBtn.disabled = false;
+}
+
+function disableButtons() {
+    labelBtns.forEach(btn => btn.disabled = true);
+    acceptBtn.disabled = true;
+    skipBtn.disabled = true;
+}
+
+// Submit label
+async function submitLabel(labelValue) {
+    if (!currentImage) return;
+
+    try {
+        const response = await fetch(`/api/label/${currentImage.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: labelValue })
+        });
+
+        const result = await response.json();
+
+        sessionStats.labeled++;
+        if (result.corrected) sessionStats.corrected++;
+        updateSessionStats();
+
+        loadNextImage();
+
+    } catch (err) {
+        console.error('Error submitting label:', err);
+    }
+}
+
+// Skip image
+async function skipImage() {
+    if (!currentImage) return;
+
+    try {
+        await fetch(`/api/skip/${currentImage.id}`, { method: 'POST' });
+        sessionStats.skipped++;
+        updateSessionStats();
+        loadNextImage();
+
+    } catch (err) {
+        console.error('Error skipping:', err);
+    }
+}
+
+// Accept prediction
+function acceptPrediction() {
+    if (!currentImage || currentImage.prediction_value === null) return;
+    submitLabel(currentImage.prediction_value);
+}
+
+// Update session stats display
+function updateSessionStats() {
+    document.getElementById('session-labeled').textContent = sessionStats.labeled;
+    document.getElementById('session-corrected').textContent = sessionStats.corrected;
+    document.getElementById('session-skipped').textContent = sessionStats.skipped;
+
+    const elapsed = (Date.now() - sessionStats.startTime) / 60000; // minutes
+    const speed = elapsed > 0 ? (sessionStats.labeled / elapsed).toFixed(1) : 0;
+    document.getElementById('session-speed').textContent = speed + ' img/min';
+}
+
+// Event listeners
+labelBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        submitLabel(parseInt(btn.dataset.label));
+    });
+});
+
+acceptBtn.addEventListener('click', acceptPrediction);
+skipBtn.addEventListener('click', skipImage);
+
+document.getElementById('apply-filters').addEventListener('click', loadNextImage);
+
+document.getElementById('confidence-filter').addEventListener('input', (e) => {
+    document.getElementById('confidence-value').textContent = e.target.value;
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    switch(e.key) {
+        case '1': submitLabel(0); break;  // WITH_COLLAR
+        case '2': submitLabel(1); break;  // WITHOUT_COLLAR
+        case 'u': case 'U': submitLabel(-1); break;  // UNCLEAR
+        case 'n': case 'N': submitLabel(-2); break;  // NO_DOG
+        case ' ': e.preventDefault(); acceptPrediction(); break;
+        case 's': case 'S': skipImage(); break;
+    }
+});
+
+// Initial load
+loadNextImage();
+</script>
+{% endblock %}
