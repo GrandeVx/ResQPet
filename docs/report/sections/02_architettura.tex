@@ -1,0 +1,120 @@
+% ============================================
+% SEZIONE 2: ARCHITETTURA DEL SISTEMA
+% ============================================
+
+\section{Architettura del Sistema}
+\label{sec:architettura}
+
+\subsection{Overview della Pipeline}
+
+Il sistema ResQPet implementa un'architettura a pipeline multi-stadio per l'identificazione dello stato di abbandono nei cani. La pipeline si compone di tre fasi principali:
+
+\begin{enumerate}
+    \item \textbf{Detection e Pose Estimation}: Un modello YOLO11 specializzato rileva i cani nel frame ed estrae 24 keypoints anatomici
+    \item \textbf{Classificazione Parallela}: Quattro classificatori indipendenti analizzano aspetti diversi del cane rilevato
+    \item \textbf{Fusione Pesata}: Le probabilità dei classificatori vengono combinate in uno \textit{Stray Index} finale
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.95\textwidth}{!}{%
+        \input{figures/pipeline_overview.tikz}
+    }%
+    \caption{Architettura complessiva del sistema ResQPet. Il backbone YOLO11 estrae bounding box e keypoints, che vengono poi elaborati da quattro classificatori specializzati. Le probabilità risultanti sono combinate attraverso fusione pesata per produrre lo Stray Index finale.}
+    \label{fig:pipeline}
+\end{figure}
+
+\subsection{Flusso dei Dati}
+
+Il flusso di elaborazione procede come segue:
+
+\begin{enumerate}
+    \item \textbf{Input}: Frame video/immagine dalla sorgente CCTV
+    \item \textbf{Backbone}: YOLO11 Dog-Pose rileva ogni cane e produce:
+    \begin{itemize}
+        \item Bounding box $[x_1, y_1, x_2, y_2]$
+        \item 24 keypoints anatomici con confidence
+        \item ROI (Region of Interest) croppata
+    \end{itemize}
+    \item \textbf{Pre-processing}:
+    \begin{itemize}
+        \item Normalizzazione keypoints rispetto alla bbox
+        \item Resize ROI per i classificatori (224$\times$224)
+    \end{itemize}
+    \item \textbf{Classificazione Parallela}: Per ogni cane rilevato:
+    \begin{itemize}
+        \item Collar Detector $\rightarrow P(\text{no\_collar})$
+        \item Skin Classifier $\rightarrow P(\text{disease})$
+        \item Pose Classifier $\rightarrow P(\text{stray\_pose})$
+        \item Breed Classifier $\rightarrow P(\text{stray}|\text{breed})$
+    \end{itemize}
+    \item \textbf{Fusione}: Combinazione pesata delle quattro probabilit\`a
+    \item \textbf{Output}: Stray Index $\in [0, 1]$ con classificazione
+\end{enumerate}
+
+\subsection{Moduli di Classificazione}
+
+I quattro classificatori sono progettati per catturare aspetti complementari che indicano lo stato di abbandono:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Modulo} & \textbf{Architettura} & \textbf{Input} & \textbf{Peso} \\
+\midrule
+Collar Detector & YOLOv8n & ROI 640$\times$640 & 35\% \\
+Skin Classifier & ResNet50 & ROI 224$\times$224 & 20\% \\
+Pose Classifier & MLP & 72 features & 25\% \\
+Breed Classifier & EfficientNet-B0 & ROI 224$\times$224 & 20\% \\
+\bottomrule
+\end{tabular}
+\caption{Riepilogo dei moduli di classificazione con relative architetture, input e pesi nella fusione.}
+\label{tab:moduli}
+\end{table}
+
+\subsubsection{Collar Detector}
+Rileva la presenza di collare, pettorina o guinzaglio. L'assenza di accessori \`e un forte indicatore di cane randagio, motivo per cui questo modulo ha il peso maggiore (35\%).
+
+\subsubsection{Skin Classifier}
+Identifica patologie cutanee indicative di trascuratezza o abbandono prolungato. Le malattie della pelle non curate suggeriscono mancanza di cure veterinarie.
+
+\subsubsection{Pose Classifier}
+Analizza la postura del cane basandosi sui keypoints estratti. Utilizza un approccio di \textbf{weak supervision} (descritto in dettaglio nella Sezione \ref{sec:pose}) per identificare posture tipiche di cani randagi (coda tra le gambe, testa bassa, postura difensiva).
+
+\subsubsection{Breed Classifier}
+Identifica la razza del cane per applicare prior statistici. Alcune razze sono statisticamente pi\`u rappresentate nei canili italiani (es. Pitbull, meticci) rispetto ad altre (es. Retriever, razze toy).
+
+\subsection{Sistema di Fusione}
+\label{sec:fusion_overview}
+
+Le probabilit\`a dei quattro classificatori vengono combinate attraverso una media pesata:
+
+\begin{equation}
+    \text{Stray Index} = w_c \cdot P_c + w_s \cdot P_s + w_p \cdot P_p + w_b \cdot P_b
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $P_c$ = probabilit\`a di assenza collare
+    \item $P_s$ = probabilit\`a di malattia cutanea
+    \item $P_p$ = probabilit\`a di postura stray-like
+    \item $P_b$ = prior di abbandono dato la razza
+    \item $w_c = 0.35$, $w_s = 0.20$, $w_p = 0.25$, $w_b = 0.20$
+\end{itemize}
+
+Lo Stray Index risultante viene classificato in tre categorie:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cll}
+\toprule
+\textbf{Range} & \textbf{Classificazione} & \textbf{Colore} \\
+\midrule
+$[0.0, 0.3)$ & Padronale & \colorbox{green!30}{Verde} \\
+$[0.3, 0.7)$ & Possibile Smarrito & \colorbox{yellow!50}{Giallo} \\
+$[0.7, 1.0]$ & Probabile Randagio & \colorbox{red!30}{Rosso} \\
+\bottomrule
+\end{tabular}
+\caption{Soglie di classificazione dello Stray Index.}
+\label{tab:soglie}
+\end{table}
