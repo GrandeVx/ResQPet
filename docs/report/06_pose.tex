@@ -1,0 +1,250 @@
+% ============================================
+% SEZIONE 6: STRAY POSE CLASSIFIER (CONTRIBUTO ORIGINALE)
+% ============================================
+
+\section{Stray Pose Classifier}
+\label{sec:pose}
+
+\subsection{Contributo Originale: Weak Supervision}
+
+Il Pose Classifier rappresenta il \textbf{contributo originale} di questo lavoro. Invece di richiedere annotazioni manuali costose e soggettive per classificare le posture come ``stray-like'' o ``owned-like'', proponiamo un approccio di \textbf{weak supervision} che sfrutta l'origine dei dati come supervisione implicita.
+
+\begin{figure}[H]
+    \centering
+    \input{figures/weak_supervision.tikz}
+    \caption{Schema dell'approccio weak supervision. I label sono derivati automaticamente dall'origine del dataset: keypoints da FYP Dataset (cani randagi) ricevono label=1, keypoints da Stanford Dogs (cani padronali) ricevono label=0.}
+    \label{fig:weak_supervision}
+\end{figure}
+
+\subsection{Motivazione}
+
+L'annotazione manuale della postura presenta problemi significativi:
+
+\begin{itemize}
+    \item \textbf{Soggettivit\`a}: Cosa definisce una ``postura da randagio''?
+    \item \textbf{Costo}: Annotare migliaia di pose richiede tempo e risorse
+    \item \textbf{Inconsistenza}: Annotatori diversi producono label diversi
+    \item \textbf{Scalabilit\`a}: Difficile estendere a nuovi dataset
+\end{itemize}
+
+Il nostro approccio risolve questi problemi derivando i label automaticamente dalla provenienza delle immagini.
+
+\subsection{Approccio Weak Supervision}
+
+\subsubsection{Assunzione Fondamentale}
+
+\begin{quote}
+\textit{I cani fotografati in dataset di cani randagi (es. FYP Dataset) tendono ad avere posture diverse dai cani fotografati in contesti domestici/esposizioni (es. Stanford Dogs).}
+\end{quote}
+
+Questa assunzione si basa sul fatto che:
+\begin{itemize}
+    \item I cani randagi mostrano spesso comportamenti difensivi, sottomessi o stressati
+    \item I cani padronali in foto sono tipicamente rilassati, in posa, o in attivit\`a ludiche
+\end{itemize}
+
+\subsubsection{Schema di Labeling}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Dataset Origine} & \textbf{Label} & \textbf{Motivazione} \\
+\midrule
+FYP Dataset & 1 (Stray) & Cani randagi di strada \\
+Stanford Dogs & 0 (Owned) & Cani in contesti domestici/show \\
+Dog's Skin Diseases & 0 (Owned) & Cani con proprietari (dal veterinario) \\
+\bottomrule
+\end{tabular}
+\caption{Schema di assegnazione automatica dei label basato sull'origine del dataset.}
+\label{tab:weak_labels}
+\end{table}
+
+\subsubsection{Pipeline di Estrazione}
+
+\begin{enumerate}
+    \item Per ogni immagine nei dataset:
+    \begin{enumerate}
+        \item Eseguire YOLO11 Dog-Pose per detection
+        \item Filtrare detection con confidence $> 0.7$
+        \item Estrarre keypoints e normalizzare rispetto a bbox
+        \item Assegnare label basato su origine dataset
+    \end{enumerate}
+    \item Bilanciare le classi (stesso numero di campioni)
+    \item Split train/val/test stratificato
+\end{enumerate}
+
+\subsection{Architettura MLP}
+
+Il classificatore utilizza un Multi-Layer Perceptron leggero, ottimale per input numerici strutturati.
+
+\begin{figure}[H]
+    \centering
+    \input{figures/mlp_pose.tikz}
+    \caption{Architettura del Pose Classifier MLP. Input: 72 features (24 keypoints $\times$ 3 valori). Output: probabilit\`a di postura stray-like.}
+    \label{fig:mlp_pose}
+\end{figure}
+
+\subsubsection{Dettaglio Architettura}
+
+\begin{lstlisting}[style=python, caption={Definizione architettura StrayPoseMLP}]
+class StrayPoseMLP(nn.Module):
+    def __init__(self, input_dim=72, hidden_dims=[128, 64], dropout=0.3):
+        super().__init__()
+
+        layers = []
+        prev_dim = input_dim  # 72 = 24 keypoints * 3
+
+        for hidden_dim in hidden_dims:
+            layers.extend([
+                nn.Linear(prev_dim, hidden_dim),
+                nn.ReLU(),
+                nn.BatchNorm1d(hidden_dim),
+                nn.Dropout(dropout)
+            ])
+            prev_dim = hidden_dim
+
+        # Output layer
+        layers.append(nn.Linear(prev_dim, 1))
+        layers.append(nn.Sigmoid())
+
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)  # P(stray_pose)
+\end{lstlisting}
+
+\subsubsection{Dimensioni Tensori}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcl}
+\toprule
+\textbf{Layer} & \textbf{Output Shape} & \textbf{Parametri} \\
+\midrule
+Input & (B, 72) & -- \\
+Linear + ReLU + BN + Dropout & (B, 128) & $72 \times 128 + 128 = 9,344$ \\
+Linear + ReLU + BN + Dropout & (B, 64) & $128 \times 64 + 64 = 8,256$ \\
+Linear + Sigmoid & (B, 1) & $64 \times 1 + 1 = 65$ \\
+\midrule
+\textbf{Totale} & -- & \textbf{$\sim$17,665} \\
+\bottomrule
+\end{tabular}
+\caption{Dimensioni dei tensori e numero di parametri per layer.}
+\label{tab:mlp_dims}
+\end{table}
+
+\subsection{Feature Input: Keypoints Normalizzati}
+
+L'input al classificatore \`e un vettore di 72 features:
+
+\begin{equation}
+    \mathbf{x} = [x_0, y_0, v_0, x_1, y_1, v_1, \ldots, x_{23}, y_{23}, v_{23}]
+\end{equation}
+
+dove per ogni keypoint $i$:
+\begin{itemize}
+    \item $x_i \in [0, 1]$: coordinata x normalizzata rispetto a bbox
+    \item $y_i \in [0, 1]$: coordinata y normalizzata rispetto a bbox
+    \item $v_i \in [0, 1]$: visibility score
+\end{itemize}
+
+\subsection{Indicatori Comportamentali}
+
+Il modello impara implicitamente a riconoscere pattern posturali associati a stress/abbandono:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Indicatore} & \textbf{Keypoints Coinvolti} \\
+\midrule
+Coda tra le gambe & tail\_start, tail\_end, back\_paws \\
+Testa bassa & nose, chin, throat vs withers \\
+Orecchie appiattite & ear\_base, ear\_tip \\
+Postura accucciata & rapporto altezza/larghezza corpo \\
+Stance difensiva & distanza tra front\_paws e back\_paws \\
+Asimmetria posturale & confronto lato sinistro/destro \\
+\bottomrule
+\end{tabular}
+\caption{Indicatori comportamentali impliciti catturati dal modello attraverso i keypoints.}
+\label{tab:pose_indicators}
+\end{table}
+
+\subsection{Dataset}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Origine Stray (label=1) & FYP Dataset \\
+Origine Owned (label=0) & Stanford Dogs + Skin Dataset \\
+Campioni totali & $\sim$2,000+ (bilanciati) \\
+Training & 70\% \\
+Validation & 15\% \\
+Test & 15\% \\
+\bottomrule
+\end{tabular}
+\caption{Composizione del dataset per il Pose Classifier.}
+\label{tab:pose_dataset}
+\end{table}
+
+\subsection{Training}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Epochs & 100 \\
+Batch size & 64 \\
+Optimizer & Adam \\
+Learning rate & $10^{-3}$ \\
+Weight decay & $10^{-4}$ \\
+Loss & BCELoss \\
+Scheduler & ReduceLROnPlateau \\
+Early stopping & 15 epochs \\
+\bottomrule
+\end{tabular}
+\caption{Configurazione training del Pose Classifier.}
+\label{tab:pose_training}
+\end{table}
+
+\subsection{Vantaggi dell'Approccio}
+
+\begin{enumerate}
+    \item \textbf{Nessuna annotazione manuale}: I label derivano automaticamente
+    \item \textbf{Scalabilit\`a}: Facilmente estendibile con nuovi dataset
+    \item \textbf{Consistenza}: Eliminata la soggettivit\`a umana
+    \item \textbf{Dataset ampio}: Potenzialmente decine di migliaia di campioni
+    \item \textbf{Riproducibilit\`a}: Processo completamente automatico
+\end{enumerate}
+
+\subsection{Limitazioni}
+
+\begin{itemize}
+    \item \textbf{Label noise}: Non tutti i cani del FYP mostrano posture ``stray''
+    \item \textbf{Overlap}: Alcune posture sono comuni a entrambe le categorie
+    \item \textbf{Bias del dataset}: La qualit\`a dipende dalla rappresentativit\`a dei dataset
+\end{itemize}
+
+\subsection{Metriche}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
+\midrule
+Accuracy & $> 0.70$ & -- \\
+AUC-ROC & $> 0.75$ & -- \\
+Sensitivity (Recall stray) & $> 0.70$ & -- \\
+Specificity (Recall owned) & $> 0.70$ & -- \\
+\bottomrule
+\end{tabular}
+\caption{Metriche di valutazione del Pose Classifier.}
+\label{tab:pose_metrics}
+\end{table}
