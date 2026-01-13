@@ -1,0 +1,191 @@
+% ============================================
+% SEZIONE 8: SISTEMA DI FUSIONE
+% ============================================
+
+\section{Sistema di Fusione}
+\label{sec:fusion}
+
+\subsection{Obiettivo}
+
+Il sistema di fusione combina le probabilit\`a dei quattro classificatori in un unico \textbf{Stray Index}, una metrica normalizzata in $[0, 1]$ che quantifica la probabilit\`a che un cane sia randagio.
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.9\textwidth}{!}{%
+        \input{figures/fusion_diagram.tikz}
+    }%
+    \caption{Schema del sistema di fusione pesata. Le quattro probabilit\`a vengono combinate attraverso una media pesata per produrre lo Stray Index finale.}
+    \label{fig:fusion}
+\end{figure}
+
+\subsection{Componenti della Fusione}
+
+Le quattro probabilit\`a in input rappresentano aspetti complementari:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Componente} & \textbf{Significato} & \textbf{Peso} & \textbf{Range} \\
+\midrule
+$P_c$ (collar) & Probabilit\`a assenza collare & 35\% & $[0, 1]$ \\
+$P_s$ (skin) & Probabilit\`a malattia cutanea & 20\% & $[0, 1]$ \\
+$P_p$ (pose) & Probabilit\`a postura stray-like & 25\% & $[0, 1]$ \\
+$P_b$ (breed) & Prior abbandono data la razza & 20\% & $[0, 1]$ \\
+\bottomrule
+\end{tabular}
+\caption{Componenti della fusione con relativi pesi e range.}
+\label{tab:fusion_components}
+\end{table}
+
+\subsection{Formula di Fusione}
+
+Lo Stray Index \`e calcolato come media pesata:
+
+\begin{equation}
+    \text{SI} = w_c \cdot P_c + w_s \cdot P_s + w_p \cdot P_p + w_b \cdot P_b
+\end{equation}
+
+dove $w_c = 0.35$, $w_s = 0.20$, $w_p = 0.25$, $w_b = 0.20$ e $\sum w_i = 1$.
+
+\subsubsection{Implementazione}
+
+\begin{lstlisting}[style=python, caption={Calcolo dello Stray Index}]
+FUSION_WEIGHTS = {
+    'collar': 0.35,
+    'skin': 0.20,
+    'pose': 0.25,
+    'breed': 0.20
+}
+
+def compute_stray_index(p_collar, p_skin, p_pose, p_breed):
+    stray_index = (
+        FUSION_WEIGHTS['collar'] * p_collar +
+        FUSION_WEIGHTS['skin'] * p_skin +
+        FUSION_WEIGHTS['pose'] * p_pose +
+        FUSION_WEIGHTS['breed'] * p_breed
+    )
+    return np.clip(stray_index, 0, 1)
+\end{lstlisting}
+
+\subsection{Giustificazione dei Pesi}
+
+I pesi sono stati scelti in base alla rilevanza diagnostica di ciascun indicatore:
+
+\begin{itemize}
+    \item \textbf{Collar (35\%)}: L'assenza di collare \`e l'indicatore pi\`u forte e direttamente osservabile di non appartenenza. Un cane con collare \`e quasi certamente padronale.
+
+    \item \textbf{Pose (25\%)}: La postura riflette lo stato emotivo e comportamentale del cane. Cani randagi tendono a mostrare comportamenti difensivi o sottomessi osservabili in tempo reale.
+
+    \item \textbf{Skin (20\%)}: Le condizioni cutanee indicano il livello di cura ricevuto. Malattie non trattate suggeriscono mancanza di accesso a cure veterinarie.
+
+    \item \textbf{Breed (20\%)}: I prior statistici forniscono informazione contestuale basata su dati reali dei canili, ma sono meno specifici per il singolo individuo.
+\end{itemize}
+
+\subsection{Classificazione Finale}
+
+Lo Stray Index viene mappato in tre categorie semantiche:
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.9\textwidth}{!}{%
+        \input{figures/stray_index_bar.tikz}
+    }%
+    \caption{Visualizzazione delle soglie di classificazione dello Stray Index. Verde: Padronale, Giallo: Possibile smarrito, Rosso: Probabile randagio.}
+    \label{fig:stray_bar}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ccll}
+\toprule
+\textbf{Range SI} & \textbf{Codice} & \textbf{Classificazione} & \textbf{Azione} \\
+\midrule
+$[0.0, 0.3)$ & \colorbox{green!30}{Verde} & Padronale & Nessuna \\
+$[0.3, 0.7)$ & \colorbox{yellow!50}{Giallo} & Possibile Smarrito & Monitoraggio \\
+$[0.7, 1.0]$ & \colorbox{red!30}{Rosso} & Probabile Randagio & Alert attivo \\
+\bottomrule
+\end{tabular}
+\caption{Soglie di classificazione e azioni associate.}
+\label{tab:stray_thresholds}
+\end{table}
+
+\subsubsection{Implementazione Classificazione}
+
+\begin{lstlisting}[style=python, caption={Classificazione basata su Stray Index}]
+THRESHOLDS = {'owned': 0.3, 'lost': 0.7}
+
+def classify_stray_index(stray_index):
+    if stray_index < THRESHOLDS['owned']:
+        return {
+            'status': 'PADRONALE',
+            'color': '#22c55e',  # Verde
+            'action': 'none',
+            'confidence': 1 - stray_index / 0.3
+        }
+    elif stray_index < THRESHOLDS['lost']:
+        return {
+            'status': 'POSSIBILE_SMARRITO',
+            'color': '#eab308',  # Giallo
+            'action': 'monitor',
+            'confidence': 1 - 2 * abs(stray_index - 0.5)
+        }
+    else:
+        return {
+            'status': 'PROBABILE_RANDAGIO',
+            'color': '#ef4444',  # Rosso
+            'action': 'alert',
+            'confidence': (stray_index - 0.7) / 0.3
+        }
+\end{lstlisting}
+
+\subsection{Analisi di Sensibilit\`a}
+
+L'impatto di ciascun componente sullo Stray Index finale \`e stato analizzato variando i pesi:
+
+\begin{itemize}
+    \item \textbf{Collar}: Ha l'impatto maggiore. Variando $w_c$ da 0.1 a 0.5, lo SI varia significativamente
+    \item \textbf{Pose}: Secondo per importanza, cattura comportamenti osservabili
+    \item \textbf{Skin/Breed}: Contributi pi\`u moderati, utili per disambiguazione
+\end{itemize}
+
+\subsection{Esempio di Calcolo}
+
+\textbf{Scenario}: Cane rilevato con i seguenti valori:
+
+\begin{itemize}
+    \item $P_c = 0.80$ (probabilmente senza collare)
+    \item $P_s = 0.30$ (possibile lieve condizione cutanea)
+    \item $P_p = 0.65$ (postura moderatamente stray-like)
+    \item $P_b = 0.55$ (razza a media presenza nei canili)
+\end{itemize}
+
+\textbf{Calcolo}:
+\begin{align}
+    \text{SI} &= 0.35 \times 0.80 + 0.20 \times 0.30 + 0.25 \times 0.65 + 0.20 \times 0.55 \\
+    &= 0.28 + 0.06 + 0.1625 + 0.11 \\
+    &= 0.6125
+\end{align}
+
+\textbf{Risultato}: $\text{SI} = 0.61 \rightarrow$ \colorbox{yellow!50}{POSSIBILE SMARRITO}
+
+\subsection{Gestione Valori Mancanti}
+
+Nel caso un classificatore non sia disponibile o fallisca:
+
+\begin{lstlisting}[style=python, caption={Gestione valori mancanti nella fusione}]
+def compute_stray_index_robust(components):
+    # Valori di default (massima incertezza)
+    defaults = {
+        'collar': 0.5, 'skin': 0.3,
+        'pose': 0.5, 'breed': 0.5
+    }
+
+    # Usa valore reale o default
+    values = {k: components.get(k, defaults[k]) for k in FUSION_WEIGHTS}
+
+    # Calcola SI
+    stray_index = sum(FUSION_WEIGHTS[k] * values[k] for k in FUSION_WEIGHTS)
+
+    return stray_index
+\end{lstlisting}
