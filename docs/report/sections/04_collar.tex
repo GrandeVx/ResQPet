@@ -1,0 +1,339 @@
+% ============================================
+% SEZIONE 4: COLLAR DETECTOR
+% ============================================
+
+\section{Collar Detector}
+\label{sec:collar}
+
+\subsection{Ruolo nel Sistema}
+
+Il Collar Detector ha il compito di rilevare la presenza o assenza di collare, pettorina o guinzaglio sul cane. Questo \`e considerato l'\textbf{indicatore pi\`u forte} di possesso, motivo per cui ha il peso maggiore nella fusione (35\%).
+
+\begin{itemize}
+    \item \textbf{Input}: ROI del cane (immagine croppata dalla detection)
+    \item \textbf{Output}: $P(\text{no\_collar}) \in [0, 1]$
+    \item \textbf{Peso Fusion}: 35\%
+\end{itemize}
+
+Un cane con collare \`e quasi certamente padronale, mentre l'assenza di accessori suggerisce (ma non conferma) un possibile stato di abbandono.
+
+\subsection{Architettura}
+
+Il Collar Detector utilizza YOLOv8n (nano) fine-tuned per object detection su due classi:
+
+\subsubsection{Classi di Detection}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cl}
+\toprule
+\textbf{Classe ID} & \textbf{Nome} \\
+\midrule
+0 & Dog-with-Leash (con collare/guinzaglio) \\
+1 & Dog-without-Leash (senza accessori) \\
+\bottomrule
+\end{tabular}
+\caption{Classi del Collar Detector.}
+\label{tab:collar_classes}
+\end{table}
+
+\subsubsection{Logica di Output}
+
+\begin{lstlisting}[style=python, caption={Calcolo della probabilit\`a di assenza collare}]
+def predict_collar(roi):
+    results = collar_detector(roi)
+
+    for detection in results:
+        cls = detection.class_id
+        conf = detection.confidence
+
+        if cls == 0:  # Dog-with-Leash
+            return 1.0 - conf  # Bassa P(no_collar)
+        elif cls == 1:  # Dog-without-Leash
+            return conf  # Alta P(no_collar)
+
+    return 0.7  # Default: probabilmente senza (nessuna detection)
+\end{lstlisting}
+
+% ============================================
+\subsection{Evoluzione del Dataset: Dal Problema alla Soluzione}
+% ============================================
+
+Lo sviluppo del Collar Detector ha attraversato due fasi distinte, evidenziando l'importanza della quantit\`a e qualit\`a dei dati nel deep learning.
+
+\subsubsection{Fase 1: Dataset Roboflow (v1)}
+
+Il primo training \`e stato effettuato sul dataset ``Dog with Leash'' disponibile su Roboflow.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Nome & Dog with Leash \\
+Fonte & Roboflow \\
+Totale immagini & 152 \\
+Training set & 106 (69.7\%) \\
+Validation set & 30 (19.7\%) \\
+Test set & 16 (10.5\%) \\
+\bottomrule
+\end{tabular}
+\caption{Statistiche del dataset Roboflow (v1).}
+\label{tab:collar_dataset_v1}
+\end{table}
+
+\paragraph{Limitazioni riscontrate:}
+\begin{itemize}
+    \item \textbf{Dimensione insufficiente}: Solo 152 immagini totali
+    \item \textbf{Variabilit\`a limitata}: Poche condizioni di illuminazione e sfondo
+    \item \textbf{Performance scadenti}: mAP@0.5 = 51\%, insufficiente per produzione
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{v1 (Roboflow)} \\
+\midrule
+mAP@0.5 & $> 0.75$ & 0.51 \\
+Precision & $> 0.70$ & 0.48 \\
+Recall & $> 0.70$ & 0.54 \\
+\bottomrule
+\end{tabular}
+\caption{Metriche v1: performance insufficienti dovute al dataset limitato.}
+\label{tab:collar_metrics_v1}
+\end{table}
+
+\subsubsection{Soluzione: Piattaforma di Labeling Custom}
+
+Per superare le limitazioni dei dati disponibili, \`e stata sviluppata una \textbf{piattaforma web di labeling} dedicata, permettendo la creazione collaborativa di un dataset di dimensioni adeguate.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox{0.9\textwidth}{
+    \textbf{Piattaforma di Labeling ResQPet}\\[0.3cm]
+    Stack: Flask + SQLAlchemy + Bootstrap\\
+    Features:
+    \begin{itemize}
+        \item Multi-user con gestione ruoli
+        \item Pre-labeling automatico con modello esistente
+        \item Interfaccia di revisione con skip/approve/reject
+        \item Export JSON per analisi
+        \item Sistema di merge annotazioni multi-utente
+        \item Statistiche real-time per utente
+    \end{itemize}
+    }}
+    \caption{Architettura della piattaforma di labeling sviluppata.}
+    \label{fig:labeling_platform}
+\end{figure}
+
+\paragraph{Workflow di annotazione:}
+\begin{enumerate}
+    \item \textbf{Indicizzazione}: Importazione immagini da Stanford Dogs e altri dataset
+    \item \textbf{Pre-labeling}: Il modello v1 genera predizioni iniziali
+    \item \textbf{Revisione umana}: Annotatori validano/correggono le predizioni
+    \item \textbf{Export}: Annotazioni esportate in formato JSON
+    \item \textbf{Merge}: Script automatico unisce contributi multi-utente
+    \item \textbf{Conversione}: Generazione dataset YOLO con split train/val
+\end{enumerate}
+
+\subsubsection{Fase 2: Dataset Merged (v2)}
+
+Attraverso la piattaforma, sono state raccolte annotazioni da 2 utenti su oltre 7,500 immagini.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Fonte & Piattaforma Labeling ResQPet \\
+Annotatori & 2 utenti \\
+Totale immagini & 7,576 \\
+Training set & 6,061 (80\%) \\
+Validation set & 1,516 (20\%) \\
+Immagini originali & Stanford Dogs + Custom \\
+\bottomrule
+\end{tabular}
+\caption{Statistiche del dataset merged (v2).}
+\label{tab:collar_dataset_v2}
+\end{table}
+
+\paragraph{Miglioramento quantitativo:}
+\begin{itemize}
+    \item \textbf{50$\times$ pi\`u dati}: Da 152 a 7,576 immagini
+    \item \textbf{Maggiore variabilit\`a}: Razze, pose, sfondi diversificati
+    \item \textbf{Annotazioni verificate}: Revisione umana delle predizioni
+\end{itemize}
+
+% ============================================
+\subsection{Training v2}
+% ============================================
+
+Il retraining con il dataset merged ha utilizzato un'infrastruttura multi-GPU per accelerare l'addestramento.
+
+\subsubsection{Hardware}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Componente} & \textbf{Specifiche} \\
+\midrule
+GPU & 2$\times$ NVIDIA RTX 5090 (32GB VRAM ciascuna) \\
+Configurazione & Multi-GPU con DataParallel \\
+Precision & Mixed Precision (FP16) \\
+\bottomrule
+\end{tabular}
+\caption{Hardware utilizzato per il training v2.}
+\label{tab:collar_hardware}
+\end{table}
+
+\subsubsection{Configurazione Training}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Parametro} & \textbf{v1 (Roboflow)} & \textbf{v2 (Merged)} \\
+\midrule
+Modello base & YOLOv8n & YOLOv8n \\
+Epochs & 150 & 100 \\
+Image size & 640 $\times$ 640 & 640 $\times$ 640 \\
+Batch size & 8 & 128 (64/GPU) \\
+Optimizer & AdamW & AdamW \\
+Learning rate & 0.001 & 0.001 \\
+Early stopping & 30 epochs & 20 epochs \\
+Training time & $\sim$1 ora & $\sim$20 minuti \\
+\bottomrule
+\end{tabular}
+\caption{Confronto configurazione training v1 vs v2.}
+\label{tab:collar_training_comparison}
+\end{table}
+
+\subsubsection{Data Augmentation}
+
+Con un dataset pi\`u ampio, l'augmentation \`e stato moderato rispetto alla versione precedente:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Trasformazione} & \textbf{v1} & \textbf{v2} \\
+\midrule
+HSV Saturation & 0.8 & 0.7 \\
+HSV Value & 0.5 & 0.4 \\
+Rotazione & $\pm 20$\textdegree & $\pm 15$\textdegree \\
+Scaling & $0.4$-$1.6\times$ & $0.5$-$1.5\times$ \\
+MixUp & 20\% & 10\% \\
+Mosaic & 100\% & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{Confronto augmentation v1 vs v2. Con pi\`u dati, l'augmentation aggressivo diventa meno necessario.}
+\label{tab:collar_aug_comparison}
+\end{table}
+
+% ============================================
+\subsection{Risultati e Confronto}
+% ============================================
+
+Il retraining ha prodotto un miglioramento significativo delle metriche.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{v1 (152 img)} & \textbf{v2 (7,576 img)} \\
+\midrule
+mAP@0.5 & $> 0.75$ & 0.51 & \textbf{0.853} \\
+mAP@0.5:0.95 & $> 0.50$ & 0.33 & \textbf{0.722} \\
+Precision & $> 0.70$ & 0.48 & \textbf{0.741} \\
+Recall & $> 0.70$ & 0.54 & \textbf{0.854} \\
+\bottomrule
+\end{tabular}
+\caption{Confronto metriche v1 vs v2. Il miglioramento \`e del 67\% sul mAP@0.5.}
+\label{tab:collar_metrics_comparison}
+\end{table}
+
+\subsubsection{Validazione su Annotazioni Umane}
+
+Per validare ulteriormente il modello, \`e stata calcolata l'accuratezza rispetto alle etichette umane:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Metrica} & \textbf{Valore} \\
+\midrule
+Immagini con label umano & 133 \\
+Accuracy (Model vs Human) & \textbf{86.5\%} \\
+Matches & 115 \\
+Mismatches & 18 \\
+\bottomrule
+\end{tabular}
+\caption{Confronto predizioni modello vs annotazioni umane.}
+\label{tab:collar_human_validation}
+\end{table}
+
+\paragraph{Confusion Matrix (WITH\_COLLAR detection):}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+& \textbf{Pred: WITH} & \textbf{Pred: WITHOUT} \\
+\midrule
+\textbf{Actual: WITH} & 56 (TP) & 8 (FN) \\
+\textbf{Actual: WITHOUT} & 10 (FP) & 59 (TN) \\
+\bottomrule
+\end{tabular}
+\caption{Confusion matrix del modello v2 rispetto alle annotazioni umane.}
+\label{tab:collar_confusion}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Precision}: 84.8\% (56/66)
+    \item \textbf{Recall}: 87.5\% (56/64)
+    \item \textbf{F1 Score}: 86.2\%
+\end{itemize}
+
+% ============================================
+\subsection{Lezioni Apprese}
+% ============================================
+
+Lo sviluppo del Collar Detector evidenzia principi fondamentali del deep learning:
+
+\begin{enumerate}
+    \item \textbf{Qualit\`a $>$ Complessit\`a del modello}: YOLOv8n (stesso modello) con 50$\times$ pi\`u dati ha migliorato del 67\%
+
+    \item \textbf{Human-in-the-loop}: La combinazione di pre-labeling automatico + revisione umana \`e efficiente e scalabile
+
+    \item \textbf{Iterazione}: Il modello v1 (seppur scadente) ha accelerato la creazione del dataset v2 attraverso il pre-labeling
+
+    \item \textbf{Multi-GPU scaling}: Batch size maggiore (128 vs 8) ha ridotto il training da 1h a 20min
+\end{enumerate}
+
+\subsection{Fallback Heuristic}
+
+Nel caso il modello non sia disponibile, viene utilizzata un'euristica basata sull'analisi del colore nella regione del collo:
+
+\begin{lstlisting}[style=python, caption={Euristica fallback per detection collare}]
+def heuristic_collar_detection(roi):
+    # Estrai regione collo (1/3 superiore)
+    h, w = roi.shape[:2]
+    neck_region = roi[0:h//3, :]
+
+    # Converti in HSV
+    hsv = cv2.cvtColor(neck_region, cv2.COLOR_BGR2HSV)
+
+    # Cerca colori saturi (tipici di collari)
+    saturation = hsv[:, :, 1]
+    high_saturation_ratio = (saturation > 100).mean()
+
+    # Collari hanno spesso colori artificiali/saturi
+    if high_saturation_ratio > 0.15:
+        return 0.3  # Probabile collare
+    else:
+        return 0.6  # Probabilmente senza
+\end{lstlisting}
