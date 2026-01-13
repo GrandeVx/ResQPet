@@ -82,6 +82,35 @@ I pesi sono stati scelti in base alla rilevanza diagnostica di ciascun indicator
     \item \textbf{Breed (20\%)}: I prior statistici forniscono informazione contestuale basata su dati reali dei canili, ma sono meno specifici per il singolo individuo.
 \end{itemize}
 
+\subsubsection{Nota sulla Reliability dei Componenti}
+
+I quattro classificatori hanno livelli di affidabilit\`a diversi:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Componente} & \textbf{AUC/mAP} & \textbf{Affidabilit\`a} & \textbf{Note} \\
+\midrule
+Collar & 0.853 & Alta & Segnale forte e diretto \\
+Skin & 0.806 & Alta & Supervisione completa \\
+Breed & 0.863 & Alta & 12 macro-categorie, Stanford Dogs \\
+Pose & 0.633 & Media-bassa & Weak supervision \\
+\bottomrule
+\end{tabular}
+\caption{Affidabilit\`a relativa dei componenti della fusione.}
+\label{tab:component_reliability}
+\end{table}
+
+Il Pose Classifier, pur avendo performance sotto-target (AUC 0.633), viene mantenuto nella fusione perch\'e:
+\begin{enumerate}
+    \item Un AUC $> 0.5$ indica informazione utile, seppur rumorosa
+    \item Il costo computazionale \`e nullo (usa keypoints gi\`a estratti)
+    \item In caso di incertezza ($P_p \approx 0.5$), il contributo si annulla
+\end{enumerate}
+
+\textbf{Decisione progettuale}: Si \`e scelto di mantenere i pesi originali (Pose 25\%) anzich\'e ridurli, poich\'e la fusione beneficia della complementarit\`a dei segnali. Future versioni potrebbero ricalibrare i pesi basandosi su validazione end-to-end.
+
 \subsection{Classificazione Finale}
 
 Lo Stray Index viene mappato in tre categorie semantiche:

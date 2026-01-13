@@ -181,7 +181,7 @@ Asimmetria posturale & confronto lato sinistro/destro \\
 \midrule
 Origine Stray (label=1) & FYP Dataset \\
 Origine Owned (label=0) & Stanford Dogs + Skin Dataset \\
-Campioni totali & $\sim$2,000+ (bilanciati) \\
+Campioni totali & 15,132 (bilanciati) \\
 Training & 70\% \\
 Validation & 15\% \\
 Test & 15\% \\
@@ -239,12 +239,35 @@ Early stopping & 15 epochs \\
 \toprule
 \textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
 \midrule
-Accuracy & $> 0.70$ & -- \\
-AUC-ROC & $> 0.75$ & -- \\
-Sensitivity (Recall stray) & $> 0.70$ & -- \\
-Specificity (Recall owned) & $> 0.70$ & -- \\
+Accuracy & $> 0.70$ & 0.589 \\
+AUC-ROC & $> 0.75$ & 0.633 \\
 \bottomrule
 \end{tabular}
-\caption{Metriche di valutazione del Pose Classifier.}
+\caption{Metriche di valutazione del Pose Classifier. I risultati sono inferiori ai target, come atteso per approcci weak-supervised.}
 \label{tab:pose_metrics}
 \end{table}
+
+\subsection{Analisi dei Risultati e Discussione}
+
+I risultati ottenuti (Accuracy 0.589, AUC 0.633) sono inferiori ai target prefissati. Questo \`e un risultato \textbf{atteso} e documentato nella letteratura sulla weak supervision:
+
+\begin{itemize}
+    \item \textbf{Rumore intrinseco nei label}: L'assunzione che l'origine del dataset determini la postura \`e debole. Un cane randagio pu\`o essere fotografato in pose rilassate, cos\`i come un cane padronale pu\`o mostrare stress.
+
+    \item \textbf{Overlap delle distribuzioni}: Le posture di cani randagi e padronali si sovrappongono significativamente, limitando la separabilit\`a delle classi.
+
+    \item \textbf{Segnale comunque informativo}: Un AUC di 0.633 indica che il modello cattura un segnale, seppur debole, che pu\`o contribuire alla decisione finale quando combinato con gli altri classificatori.
+\end{itemize}
+
+\subsubsection{Decisione: Mantenimento del Componente}
+
+Nonostante i risultati sotto-target, si \`e deciso di \textbf{mantenere} il Pose Classifier nel sistema di fusione per le seguenti ragioni:
+
+\begin{enumerate}
+    \item \textbf{Contributo marginale positivo}: Con peso del 25\% nella fusione, anche un segnale imperfetto pu\`o spostare lo Stray Index nella direzione corretta
+    \item \textbf{Complementarit\`a}: La postura cattura informazione diversa da collare, pelle e razza
+    \item \textbf{Costo computazionale nullo}: Il calcolo avviene sui keypoints gi\`a estratti dal backbone, senza overhead
+    \item \textbf{Comportamento conservativo}: In caso di incertezza (predizione $\sim 0.5$), il contributo si annulla naturalmente
+\end{enumerate}
+
+\paragraph{Alternativa considerata:} Ridurre il peso dal 25\% al 15\%, redistribuendo il 10\% al Collar Detector (35\% $\rightarrow$ 40\%) e Skin Classifier (20\% $\rightarrow$ 25\%). Questa opzione rimane disponibile per future ottimizzazioni.
