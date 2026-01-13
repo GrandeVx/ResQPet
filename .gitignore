@@ -24,6 +24,7 @@ labeling_data/
 *.gif
 *.bmp
 !docs/**/*.png
+!docs/**/*.jpg
 !frontend/**/*.png
 !frontend/**/*.jpg
 

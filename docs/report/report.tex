@@ -404,27 +404,18 @@ Augmentation & Mosaic, MixUp, HSV, Flip \\
 \section{Appendice C: Guida Installazione}
 % ============================================
 
-\begin{lstlisting}[language=bash]
-# Clone repository
-git clone https://github.com/user/resqpet.git
-cd resqpet
+Per le istruzioni di installazione aggiornate, consultare il file \texttt{README.md} e \texttt{TRAINING\_SETUP.md} nel repository ufficiale:
 
-# Backend setup
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+\begin{center}
+\url{https://github.com/GrandeVx/ResQPet}
+\end{center}
 
-# Frontend setup
-cd ../frontend
-npm install
-
-# Run application
-# Terminal 1: Backend
-cd backend && python -m app.main
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
-\end{lstlisting}
+Il repository include:
+\begin{itemize}
+    \item Istruzioni di setup backend e frontend
+    \item Link per download dei weights pre-trainati (Google Drive)
+    \item Requisiti hardware e software
+    \item Guida per ri-training dei modelli da zero
+\end{itemize}
 
 \end{document}

@@ -105,6 +105,13 @@ F1 Score & \textbf{86.2\%} \\
 \label{tab:results_collar_human}
 \end{table}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/collar_confusion_matrix.png}
+    \caption{Confusion matrix normalizzata del Collar Detector v2. Le tre classi sono ``Dog-with-Leash'' (con accessori), ``Dog-without-Leash'' (senza accessori) e ``background''. La diagonale principale mostra le detection corrette.}
+    \label{fig:collar_confusion}
+\end{figure}
+
 \subsubsection{Skin Classifier}
 
 Training: ResNet50 fine-tuned su dataset patologie cutanee canine (6 classi).

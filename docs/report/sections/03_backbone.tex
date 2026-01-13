@@ -190,4 +190,18 @@ Inference time (GPU) & $< 20$ms & $\sim 8$ms \\
 \label{tab:backbone_metrics}
 \end{table}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/backbone_training_curves.png}
+    \caption{Curve di training del backbone Dog-Pose v2. In alto: loss di training (box, pose, keypoint object, classification, DFL). In basso: loss di validation e metriche (precision, recall, mAP50, mAP50-95). Si nota la convergenza stabile senza overfitting.}
+    \label{fig:backbone_training}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/backbone_detection_examples.jpg}
+    \caption{Esempi di detection del backbone Dog-Pose su immagini di validazione. Ogni cane \`e identificato con bounding box (blu), confidence score e 24 keypoints anatomici sovrapposti.}
+    \label{fig:backbone_examples}
+\end{figure}
+
 \paragraph{Analisi:} L'elevata precision (96.9\%) indica che quasi tutte le detection sono corrette, mentre l'alto recall (97.7\%) significa che il modello rileva quasi tutti i cani presenti nel frame. Questo \`e fondamentale per il sistema ResQPet, dove ogni cane deve essere analizzato.

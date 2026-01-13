@@ -298,6 +298,20 @@ Mismatches & 18 \\
     \item \textbf{F1 Score}: 86.2\%
 \end{itemize}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/collar_training_curves.png}
+    \caption{Curve di training del Collar Detector v2 su 200 epochs. In alto: loss di training (box, classification, DFL) e metriche precision/recall. In basso: loss di validation e mAP. Si nota la convergenza progressiva del mAP@0.5 verso 0.85.}
+    \label{fig:collar_training}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/collar_detection_examples.jpg}
+    \caption{Esempi di detection del Collar Detector su immagini di validazione. Le classi ``Dog-with-Leash'' (con collare/guinzaglio) e ``Dog-without-Leash'' (senza accessori) vengono identificate con bounding box e confidence score.}
+    \label{fig:collar_examples}
+\end{figure}
+
 % ============================================
 \subsection{Lezioni Apprese}
 % ============================================

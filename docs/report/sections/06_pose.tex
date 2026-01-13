@@ -259,6 +259,13 @@ I risultati ottenuti (Accuracy 0.589, AUC 0.633) sono inferiori ai target prefis
     \item \textbf{Segnale comunque informativo}: Un AUC di 0.633 indica che il modello cattura un segnale, seppur debole, che pu\`o contribuire alla decisione finale quando combinato con gli altri classificatori.
 \end{itemize}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/keypoints_analysis.png}
+    \caption{Analisi delle distribuzioni dei keypoints per classe (Owned vs Stray). In alto a sinistra: distribuzione della confidence di detection. In alto a destra: scatter plot della posizione del naso normalizzata. In basso a sinistra: visibilit\`a media dei keypoints. In basso a destra: boxplot della posizione Y del naso. Si nota il \textbf{significativo overlap} tra le due classi, che spiega le performance limitate della weak supervision.}
+    \label{fig:keypoints_analysis}
+\end{figure}
+
 \subsubsection{Decisione: Mantenimento del Componente}
 
 Nonostante i risultati sotto-target, si \`e deciso di \textbf{mantenere} il Pose Classifier nel sistema di fusione per le seguenti ragioni:
