@@ -1,0 +1,216 @@
+% ============================================
+% SEZIONE 5: SKIN DISEASE CLASSIFIER
+% ============================================
+
+\section{Skin Disease Classifier}
+\label{sec:skin}
+
+\subsection{Ruolo nel Sistema}
+
+Lo Skin Classifier identifica patologie cutanee che possono indicare trascuratezza o abbandono prolungato. Un cane con malattie della pelle non curate suggerisce mancanza di cure veterinarie, tipica di animali randagi.
+
+\begin{itemize}
+    \item \textbf{Input}: ROI del cane ridimensionata a 224$\times$224 pixel
+    \item \textbf{Output}: $P(\text{disease}) \in [0, 1]$
+    \item \textbf{Peso Fusion}: 20\%
+\end{itemize}
+
+\subsection{Architettura}
+
+Il classificatore utilizza ResNet50 pre-trainato su ImageNet con un custom classification head.
+
+\begin{figure}[H]
+    \centering
+    \input{figures/resnet_block.tikz}
+    \caption{Blocco residuo di ResNet. La skip connection permette di trainare reti profonde evitando il problema del vanishing gradient.}
+    \label{fig:resnet_block}
+\end{figure}
+
+\subsubsection{Struttura Completa}
+
+\begin{enumerate}
+    \item \textbf{Backbone}: ResNet50 (senza ultimo layer FC)
+    \begin{itemize}
+        \item Pre-trained su ImageNet (1000 classi)
+        \item Output: 2048 features
+    \end{itemize}
+    \item \textbf{Classification Head}:
+    \begin{itemize}
+        \item Dropout(0.3)
+        \item Linear(2048 $\rightarrow$ 256)
+        \item ReLU
+        \item BatchNorm1d(256)
+        \item Dropout(0.3)
+        \item Linear(256 $\rightarrow$ 6)
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Diagramma Architettura}
+
+\begin{lstlisting}[style=python, caption={Definizione architettura Skin Classifier}]
+class SkinClassifier(nn.Module):
+    def __init__(self, num_classes=6):
+        super().__init__()
+        # Backbone ResNet50
+        self.backbone = timm.create_model(
+            'resnet50',
+            pretrained=True,
+            num_classes=0  # Rimuove FC layer
+        )
+        # Custom head
+        self.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(2048, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x):
+        features = self.backbone(x)  # (B, 2048)
+        return self.classifier(features)  # (B, 6)
+\end{lstlisting}
+
+\subsection{Dataset}
+
+Il modello \`e trainato sul dataset ``Dog's Skin Diseases'' disponibile su Kaggle.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Nome & Dog's Skin Diseases \\
+Fonte & Kaggle \\
+Totale immagini & 4,315 \\
+Training set & 3,022 (70\%) \\
+Validation set & 860 (20\%) \\
+Test set & 433 (10\%) \\
+Classi & 6 \\
+\bottomrule
+\end{tabular}
+\caption{Statistiche del dataset Skin Diseases.}
+\label{tab:skin_dataset}
+\end{table}
+
+\subsubsection{Classi Patologiche}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Classe} & \textbf{Descrizione} & \textbf{Peso Malattia} \\
+\midrule
+Healthy & Pelle sana & 0.0 \\
+Dermatitis & Infiammazione generica & 0.6 \\
+Fungal\_infections & Infezioni fungine & 0.7 \\
+Hypersensitivity & Allergie/ipersensibilit\`a & 0.4 \\
+Demodicosis & Acari Demodex & 0.8 \\
+Ringworm & Tigna (tinea) & 0.75 \\
+\bottomrule
+\end{tabular}
+\caption{Classi del dataset Skin Diseases con relativi pesi di gravit\`a. Il peso indica quanto la patologia contribuisce al P(disease).}
+\label{tab:skin_classes}
+\end{table}
+
+\subsubsection{Calcolo P(disease)}
+
+La probabilit\`a finale di malattia \`e calcolata come somma pesata delle probabilit\`a per classe:
+
+\begin{lstlisting}[style=python, caption={Calcolo della probabilit\`a di malattia cutanea}]
+DISEASE_WEIGHTS = {
+    'Healthy': 0.0,
+    'Dermatitis': 0.6,
+    'Fungal_infections': 0.7,
+    'Hypersensitivity': 0.4,
+    'Demodicosis': 0.8,
+    'Ringworm': 0.75
+}
+
+def compute_p_disease(class_probabilities):
+    p_disease = 0.0
+    for class_name, prob in class_probabilities.items():
+        p_disease += prob * DISEASE_WEIGHTS[class_name]
+    return p_disease
+\end{lstlisting}
+
+\subsection{Data Augmentation}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Trasformazione} & \textbf{Parametri} \\
+\midrule
+Resize & 256 $\times$ 256 \\
+RandomCrop & 224 $\times$ 224 \\
+Horizontal Flip & 50\% \\
+Vertical Flip & 20\% \\
+Rotazione & $\pm 15$\textdegree \\
+ColorJitter & brightness=0.2, contrast=0.2 \\
+Normalize & ImageNet mean/std \\
+\bottomrule
+\end{tabular}
+\caption{Data augmentation per il training dello Skin Classifier.}
+\label{tab:skin_aug}
+\end{table}
+
+\subsection{Training}
+
+Il training utilizza un approccio di fine-tuning progressivo:
+
+\begin{enumerate}
+    \item \textbf{Fase 1}: Freeze backbone, train solo classification head (10 epochs)
+    \item \textbf{Fase 2}: Unfreeze ultimi 2 blocchi ResNet (20 epochs)
+    \item \textbf{Fase 3}: Fine-tuning completo con LR ridotto (20 epochs)
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Epochs totali & 50 \\
+Batch size & 32 \\
+Optimizer & AdamW \\
+Learning rate & $10^{-4}$ \\
+Weight decay & $10^{-5}$ \\
+Loss & CrossEntropyLoss (class weights) \\
+Scheduler & ReduceLROnPlateau \\
+Early stopping & 10 epochs \\
+\bottomrule
+\end{tabular}
+\caption{Configurazione training dello Skin Classifier.}
+\label{tab:skin_training}
+\end{table}
+
+\subsubsection{Class Weights}
+
+Per gestire lo sbilanciamento del dataset, utilizziamo pesi inversamente proporzionali alla frequenza:
+
+\begin{equation}
+    w_i = \frac{\max_j(n_j)}{n_i}
+\end{equation}
+
+dove $n_i$ \`e il numero di campioni della classe $i$.
+
+\subsection{Metriche}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
+\midrule
+Accuracy & $> 0.80$ & -- \\
+F1-Score (macro) & $> 0.75$ & -- \\
+Precision (macro) & $> 0.75$ & -- \\
+Recall (macro) & $> 0.70$ & -- \\
+\bottomrule
+\end{tabular}
+\caption{Metriche di valutazione dello Skin Classifier.}
+\label{tab:skin_metrics}
+\end{table}
