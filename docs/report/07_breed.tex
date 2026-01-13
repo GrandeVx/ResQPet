@@ -1,0 +1,235 @@
+% ============================================
+% SEZIONE 7: BREED CLASSIFIER
+% ============================================
+
+\section{Breed Classifier}
+\label{sec:breed}
+
+\subsection{Ruolo nel Sistema}
+
+Il Breed Classifier identifica la razza del cane per applicare \textbf{prior statistici} basati su dati reali dei canili italiani. Alcune razze sono statisticamente pi\`u rappresentate tra i cani abbandonati.
+
+\begin{itemize}
+    \item \textbf{Input}: ROI del cane ridimensionata a 224$\times$224 pixel
+    \item \textbf{Output}: Categoria razza + $P(\text{stray}|\text{breed})$
+    \item \textbf{Peso Fusion}: 20\%
+\end{itemize}
+
+\subsection{Architettura}
+
+Il classificatore utilizza EfficientNet-B0, un'architettura ottimizzata per il trade-off accuracy/efficienza.
+
+\begin{figure}[H]
+    \centering
+    \input{figures/efficientnet_block.tikz}
+    \caption{Mobile Inverted Bottleneck (MBConv), il blocco fondamentale di EfficientNet. Utilizza depthwise separable convolutions e squeeze-and-excitation per efficienza.}
+    \label{fig:mbconv}
+\end{figure}
+
+\subsubsection{Struttura Completa}
+
+\begin{enumerate}
+    \item \textbf{Backbone}: EfficientNet-B0 (ImageNet pre-trained)
+    \begin{itemize}
+        \item Input: 224$\times$224$\times$3
+        \item Output: 1,280 features
+        \item Blocchi MBConv con depth-wise separable convolutions
+    \end{itemize}
+    \item \textbf{Classification Head}:
+    \begin{itemize}
+        \item Dropout(0.3)
+        \item Linear(1280 $\rightarrow$ 256)
+        \item ReLU
+        \item BatchNorm1d(256)
+        \item Dropout(0.3)
+        \item Linear(256 $\rightarrow$ 11)
+    \end{itemize}
+\end{enumerate}
+
+\begin{lstlisting}[style=python, caption={Definizione architettura Breed Classifier}]
+class BreedClassifier(nn.Module):
+    def __init__(self, num_classes=11):
+        super().__init__()
+        # EfficientNet-B0 backbone
+        self.backbone = timm.create_model(
+            'efficientnet_b0',
+            pretrained=True,
+            num_classes=0
+        )
+        # Custom classifier head
+        self.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(1280, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x):
+        features = self.backbone(x)
+        return self.classifier(features)
+
+    def predict_proba(self, x):
+        return torch.softmax(self.forward(x), dim=-1)
+\end{lstlisting}
+
+\subsection{Macro-Categorie Razze}
+
+Le 120 razze originali di Stanford Dogs vengono raggruppate in 11 macro-categorie per semplificare la classificazione e permettere l'applicazione di prior significativi.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Categoria} & \textbf{Razze Incluse} \\
+\midrule
+pitbull\_amstaff & American Staffordshire Terrier, Staffordshire Bull Terrier, Pit Bull \\
+shepherd & German Shepherd, Belgian Malinois, Australian Shepherd, Border Collie \\
+retriever & Labrador, Golden Retriever, Flat-coated Retriever \\
+hound & Beagle, Basset Hound, Bloodhound, Greyhound, Dachshund \\
+terrier & Yorkshire, West Highland, Scottish Terrier, Fox Terrier \\
+toy & Chihuahua, Maltese, Pomeranian, Toy Poodle, Papillon \\
+working & Rottweiler, Doberman, Boxer, Great Dane, Mastiff \\
+spitz & Husky, Malamute, Samoyed, Akita, Chow Chow \\
+bulldog & English Bulldog, French Bulldog, Boston Terrier \\
+poodle & Standard Poodle, Miniature Poodle \\
+mixed & Meticci, Razze non identificabili \\
+\bottomrule
+\end{tabular}
+\caption{Raggruppamento delle razze in 11 macro-categorie.}
+\label{tab:breed_groups}
+\end{table}
+
+\subsection{Breed Priors}
+
+I prior sono basati su statistiche reali dei canili italiani (fonti: ENPA, LAV):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Categoria} & \textbf{$P(\text{stray}|\text{breed})$} & \textbf{Motivazione} \\
+\midrule
+pitbull\_amstaff & 0.75 & Alta presenza nei canili \\
+mixed & 0.70 & Categoria pi\`u comune tra randagi \\
+hound & 0.55 & Cani da caccia spesso abbandonati \\
+shepherd & 0.50 & Media presenza \\
+working & 0.50 & Media presenza \\
+terrier & 0.40 & Media-bassa \\
+spitz & 0.35 & Bassa (razze ``esotiche'') \\
+bulldog & 0.30 & Bassa (costosi) \\
+poodle & 0.25 & Bassa (cani da compagnia) \\
+retriever & 0.25 & Bassa (cani da famiglia) \\
+toy & 0.20 & Molto bassa (costosi, dimensioni ridotte) \\
+\bottomrule
+\end{tabular}
+\caption{Prior di probabilit\`a di abbandono per macro-categoria di razza.}
+\label{tab:breed_priors}
+\end{table}
+
+\subsubsection{Calcolo P(stray|breed)}
+
+\begin{lstlisting}[style=python, caption={Calcolo della probabilit\`a di abbandono data la razza}]
+BREED_PRIORS = {
+    'pitbull_amstaff': 0.75, 'mixed': 0.70, 'hound': 0.55,
+    'shepherd': 0.50, 'working': 0.50, 'terrier': 0.40,
+    'spitz': 0.35, 'bulldog': 0.30, 'poodle': 0.25,
+    'retriever': 0.25, 'toy': 0.20
+}
+
+def compute_p_stray_breed(predicted_breed, confidence):
+    base_prior = BREED_PRIORS.get(predicted_breed, 0.50)
+
+    # Regolarizza verso 0.5 se confidence bassa
+    p_stray = base_prior * confidence + 0.5 * (1 - confidence)
+
+    return p_stray
+\end{lstlisting}
+
+\subsection{Dataset}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Nome & Stanford Dogs Dataset \\
+Fonte & Stanford Vision Lab \\
+Totale immagini & $\sim$20,580 \\
+Razze originali & 120 \\
+Macro-categorie & 11 \\
+Training & 70\% \\
+Validation & 15\% \\
+Test & 15\% \\
+\bottomrule
+\end{tabular}
+\caption{Statistiche del dataset Stanford Dogs.}
+\label{tab:breed_dataset}
+\end{table}
+
+\subsection{Data Augmentation}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Trasformazione} & \textbf{Parametri} \\
+\midrule
+Resize & 256 $\times$ 256 \\
+RandomCrop & 224 $\times$ 224 \\
+Horizontal Flip & 50\% \\
+Vertical Flip & 20\% \\
+Rotazione & $\pm 15$\textdegree \\
+ColorJitter & brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1 \\
+RandomAffine & translate=(0.1, 0.1), scale=(0.9, 1.1) \\
+Normalize & ImageNet mean/std \\
+\bottomrule
+\end{tabular}
+\caption{Data augmentation per il training del Breed Classifier.}
+\label{tab:breed_aug}
+\end{table}
+
+\subsection{Training}
+
+Il training utilizza learning rate differenziato per backbone e classifier:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Epochs & 30 \\
+Batch size & 32 \\
+Optimizer & AdamW \\
+LR backbone & $10^{-5}$ (fine-tuning conservativo) \\
+LR classifier & $10^{-4}$ \\
+Weight decay & $10^{-4}$ \\
+Loss & CrossEntropyLoss (class weights) \\
+Scheduler & CosineAnnealingLR (T\_max=30) \\
+Early stopping & 10 epochs \\
+\bottomrule
+\end{tabular}
+\caption{Configurazione training del Breed Classifier.}
+\label{tab:breed_training}
+\end{table}
+
+\subsection{Metriche}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
+\midrule
+Top-1 Accuracy & $> 0.60$ & -- \\
+Top-5 Accuracy & $> 0.85$ & -- \\
+F1-Score (macro) & $> 0.55$ & -- \\
+\bottomrule
+\end{tabular}
+\caption{Metriche di valutazione del Breed Classifier.}
+\label{tab:breed_metrics}
+\end{table}
