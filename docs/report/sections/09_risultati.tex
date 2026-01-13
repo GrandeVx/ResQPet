@@ -115,10 +115,10 @@ Training: ResNet50 fine-tuned su dataset patologie cutanee canine (6 classi).
 \toprule
 \textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
 \midrule
-Accuracy & $> 0.80$ & \textbf{0.85} \\
-F1-Score (macro) & $> 0.75$ & 0.82 \\
-Precision (macro) & $> 0.75$ & 0.84 \\
-Recall (macro) & $> 0.70$ & 0.80 \\
+Accuracy & $> 0.80$ & \textbf{0.806} \\
+F1-Score (macro) & $> 0.75$ & \textbf{0.761} \\
+Precision (macro) & $> 0.75$ & 0.78 \\
+Recall (macro) & $> 0.70$ & 0.76 \\
 \bottomrule
 \end{tabular}
 \caption{Metriche Skin Classifier. Accuracy target raggiunta.}
@@ -137,7 +137,7 @@ Recall (macro) & $> 0.70$ & 0.80 \\
 
 \subsubsection{Pose Classifier}
 
-Training: MLP con weak supervision sui 24 keypoints normalizzati.
+Training: MLP con weak supervision sui 24 keypoints normalizzati (15,132 campioni bilanciati).
 
 \begin{table}[H]
 \centering
@@ -145,21 +145,19 @@ Training: MLP con weak supervision sui 24 keypoints normalizzati.
 \toprule
 \textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
 \midrule
-Accuracy & $> 0.70$ & 0.75 \\
-AUC-ROC & $> 0.75$ & \textbf{0.78} \\
-Sensitivity & $> 0.70$ & 0.73 \\
-Specificity & $> 0.70$ & 0.77 \\
+Accuracy & $> 0.70$ & 0.589 \\
+AUC-ROC & $> 0.75$ & 0.633 \\
 \bottomrule
 \end{tabular}
-\caption{Metriche Pose Classifier. Nonostante il weak labeling, raggiunge AUC 0.78.}
+\caption{Metriche Pose Classifier. Risultati sotto-target, come atteso per weak supervision.}
 \label{tab:results_pose}
 \end{table}
 
-\paragraph{Nota:} Il Pose Classifier opera con \textbf{weak supervision}, estraendo pattern posturali dai keypoints. \`E il segnale pi\`u rumoroso ma comunque informativo (peso 25\% nella fusione).
+\paragraph{Nota:} Il Pose Classifier opera con \textbf{weak supervision} e raggiunge performance sotto-target (AUC 0.633 vs target 0.75). Come discusso nella Sezione~\ref{sec:pose}, questo \`e un risultato \textbf{atteso} per approcci weak-supervised dove i label derivano dall'origine del dataset. Nonostante ci\`o, il componente viene mantenuto con peso 25\% nella fusione: un AUC $> 0.5$ indica che il modello cattura informazione utile, e il costo computazionale \`e nullo (usa keypoints gi\`a estratti).
 
 \subsubsection{Breed Classifier}
 
-Training: EfficientNet-B0 fine-tuned su Stanford Dogs (120 razze).
+Training: EfficientNet-B0 fine-tuned su Stanford Dogs (120 razze $\rightarrow$ 12 macro-categorie).
 
 \begin{table}[H]
 \centering
@@ -167,16 +165,14 @@ Training: EfficientNet-B0 fine-tuned su Stanford Dogs (120 razze).
 \toprule
 \textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto} \\
 \midrule
-Top-1 Accuracy & $> 0.60$ & 0.72 \\
-Top-5 Accuracy & $> 0.85$ & \textbf{0.88} \\
-F1-Score (macro) & $> 0.55$ & 0.65 \\
+Top-1 Accuracy & $> 0.60$ & \textbf{0.863} \\
 \bottomrule
 \end{tabular}
-\caption{Metriche Breed Classifier. Top-5 accuracy raggiunge 88\%.}
+\caption{Metriche Breed Classifier. Accuracy supera ampiamente il target (86.3\% vs 60\%).}
 \label{tab:results_breed}
 \end{table}
 
-\paragraph{Utilizzo:} La razza viene usata per identificare razze tipicamente ``di casa'' (es. Chihuahua, Barboncino) vs razze spesso randagie (es. meticci, razze primitive). Contribuisce al 20\% della fusione finale.
+\paragraph{Utilizzo:} La razza viene usata per identificare razze tipicamente ``di casa'' (es. Chihuahua, Barboncino) vs razze spesso randagie (es. meticci, pitbull). Contribuisce al 20\% della fusione finale attraverso i prior $P(\text{stray}|\text{breed})$.
 
 \subsection{Performance Sistema Completo}
 
@@ -253,15 +249,15 @@ FPS (CPU) & $> 5$ & $\sim 4$ \\
 \midrule
 Backbone v2 & mAP@0.5 & $> 0.85$ & \textbf{0.987} & \checkmark \\
 Collar v2 & mAP@0.5 & $> 0.75$ & \textbf{0.853} & \checkmark \\
-Skin & Accuracy & $> 0.80$ & \textbf{0.85} & \checkmark \\
-Pose & AUC-ROC & $> 0.75$ & \textbf{0.78} & \checkmark \\
-Breed & Top-5 Acc & $> 0.85$ & \textbf{0.88} & \checkmark \\
+Skin & Accuracy & $> 0.80$ & \textbf{0.806} & \checkmark \\
+Pose$^*$ & AUC-ROC & $> 0.75$ & 0.633 & $\sim$ \\
+Breed & Top-1 Acc & $> 0.60$ & \textbf{0.863} & \checkmark \\
 \midrule
 Sistema (GPU) & Latency & $< 50$ms & $\sim 35$ms & \checkmark \\
 Sistema (GPU) & FPS & $> 15$ & $\sim 28$ & \checkmark \\
 \bottomrule
 \end{tabular}
-\caption{Riepilogo delle metriche principali. Tutti i target sono stati raggiunti.}
+\caption{Riepilogo delle metriche principali. $^*$Pose Classifier sotto-target ma mantenuto (vedi discussione).}
 \label{tab:results_summary}
 \end{table}
 
@@ -270,5 +266,7 @@ Sistema (GPU) & FPS & $> 15$ & $\sim 28$ & \checkmark \\
     \item \textbf{Backbone}: Performance eccezionali (mAP 98.7\%) grazie al dataset dog-pose specializzato
     \item \textbf{Collar}: Miglioramento del 67\% (da 0.51 a 0.853 mAP) grazie alla piattaforma di labeling custom
     \item \textbf{Validazione umana}: Accordo del 86.5\% tra modello collar e annotatori umani
+    \item \textbf{Pose}: Risultati sotto-target (AUC 0.633) come atteso per weak supervision. \textbf{Decisione}: componente mantenuto per complementarit\`a e costo nullo (Sezione~\ref{sec:pose})
+    \item \textbf{Breed}: Eccellente accuracy (86.3\%) su 12 macro-categorie, permette applicazione efficace dei prior $P(\text{stray}|\text{breed})$
     \item \textbf{Real-time}: Il sistema opera a $\sim$28 FPS su GPU, adatto a stream video
 \end{itemize}
