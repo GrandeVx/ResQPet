@@ -1,0 +1,36 @@
+% Weak Supervision Concept for Pose Classifier
+\begin{tikzpicture}[
+    node distance=1cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Datasets
+\node[box, fill=green!30] (owned) {Stanford Dogs\\(Padronali)};
+\node[box, fill=red!30, below=1.5cm of owned] (stray) {FYP Stray Dogs\\(Randagi)};
+
+% Labels
+\node[box, fill=green!10, right=2cm of owned] (label0) {Label: 0\\(Non randagio)};
+\node[box, fill=red!10, right=2cm of stray] (label1) {Label: 1\\(Randagio)};
+
+% Keypoints
+\node[box, fill=blue!20, right=2cm of label0, yshift=-0.75cm] (kpts) {24 Keypoints\\Normalizzati};
+
+% Classifier
+\node[box, fill=orange!30, right=1.5cm of kpts] (mlp) {MLP\\Classifier};
+
+% Output
+\node[box, fill=purple!20, right=1.5cm of mlp] (output) {P(stray)};
+
+% Arrows
+\draw[arrow] (owned) -- (label0);
+\draw[arrow] (stray) -- (label1);
+\draw[arrow] (label0) -- (kpts);
+\draw[arrow] (label1) -- (kpts);
+\draw[arrow] (kpts) -- (mlp);
+\draw[arrow] (mlp) -- (output);
+
+% Annotation
+\node[below=0.3cm of kpts, font=\scriptsize, align=center] {Weak Label:\\origine dataset};
+
+\end{tikzpicture}
