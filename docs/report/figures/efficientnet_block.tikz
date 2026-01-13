@@ -1,0 +1,37 @@
+% EfficientNet MBConv Block
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    box/.style={rectangle, draw, minimum width=2.2cm, minimum height=0.5cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Main path
+\node[box, fill=blue!20] (input) {Input};
+\node[box, fill=green!20, below=of input] (expand) {Conv 1$\times$1 (expand)};
+\node[box, fill=green!20, below=of expand] (bn1) {BatchNorm + Swish};
+\node[box, fill=yellow!20, below=of bn1] (dw) {DepthwiseConv 3$\times$3};
+\node[box, fill=green!20, below=of dw] (bn2) {BatchNorm + Swish};
+\node[box, fill=orange!20, below=of bn2] (se) {SE Block};
+\node[box, fill=green!20, below=of se] (project) {Conv 1$\times$1 (project)};
+\node[box, fill=green!20, below=of project] (bn3) {BatchNorm};
+
+% Addition
+\node[circle, draw, below=of bn3, minimum size=0.5cm] (add) {$+$};
+\node[box, fill=blue!20, below=of add] (output) {Output};
+
+% Arrows
+\draw[arrow] (input) -- (expand);
+\draw[arrow] (expand) -- (bn1);
+\draw[arrow] (bn1) -- (dw);
+\draw[arrow] (dw) -- (bn2);
+\draw[arrow] (bn2) -- (se);
+\draw[arrow] (se) -- (project);
+\draw[arrow] (project) -- (bn3);
+\draw[arrow] (bn3) -- (add);
+\draw[arrow] (add) -- (output);
+
+% Skip connection
+\draw[arrow, dashed, red] (input.east) -- ++(1.2,0) |- (add.east);
+\node[right=1.4cm of dw, font=\scriptsize, text=red] {Skip};
+
+\end{tikzpicture}

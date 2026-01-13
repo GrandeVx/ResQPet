@@ -1,0 +1,430 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm2e}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+% TikZ per diagrammi
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
+
+% Page setup
+\geometry{margin=2.5cm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{ResQPet}
+\fancyfoot[C]{\thepage}
+
+% Code listing style
+\lstdefinestyle{python}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red},
+    commentstyle=\color{green!60!black},
+    morecomment=[l][\color{magenta}]{\#},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!10},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)}
+}
+
+% Title configuration
+\title{
+    \vspace{-1cm}
+    {\Huge\textbf{ResQPet}}\\[0.5cm]
+    \Large Sistema di Identificazione Automatizzata\\dello Stato di Abbandono nei Cani\\[1cm]
+    \large Progetto di Fondamenti di Intelligenza Artificiale
+}
+
+\author{
+    Università degli Studi di Salerno\\
+    Dipartimento di Informatica\\[0.5cm]
+    \begin{tabular}{ll}
+    \textbf{Autore} & \textbf{Matricola} \\
+    \hline
+    D'Alfonso Vittorio & 0512120569 \\
+    D'Elia Michele & 0512120239 \\
+    De Simone Mario & 0512119765 \\
+    Del Gaizo Gianluca & 0512120119 \\
+    Forgione Alessio & 0512119915 \\
+    \end{tabular}
+}
+
+\date{Anno Accademico 2024/2025}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+% Abstract
+\begin{abstract}
+\noindent
+ResQPet è un sistema di computer vision progettato per identificare automaticamente lo stato di abbandono nei cani attraverso l'analisi di immagini e video. Il sistema utilizza un'architettura ensemble che combina multiple fonti di informazione: presenza di collare, condizioni cutanee, postura corporea e razza. Il contributo principale di questo lavoro è l'introduzione di un approccio di \textbf{weak supervision} per il classificatore di postura, che sfrutta l'origine dei dataset (cani randagi vs padronali) come supervisione implicita, eliminando la necessità di annotazione manuale. Il sistema produce uno \textit{Stray Index} normalizzato in $[0,1]$ che indica la probabilità che un cane sia randagio. L'implementazione include una GUI web-based che simula un sistema di videosorveglianza CCTV per il monitoraggio in tempo reale.
+
+\vspace{0.5cm}
+\noindent\textbf{Parole chiave}: Computer Vision, Deep Learning, Object Detection, Pose Estimation, Weak Supervision, YOLO, Ensemble Learning
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================
+% SEZIONE 1: INTRODUZIONE
+% ============================================
+
+\section{Introduzione}
+\label{sec:introduzione}
+
+\subsection{Contesto e Motivazione}
+
+Il fenomeno del randagismo rappresenta una problematica rilevante sia dal punto di vista del benessere animale che della sicurezza pubblica. In Italia, secondo i dati ENPA, sono presenti oltre 500.000 cani randagi, con un costo sociale ed economico significativo per la loro gestione.
+
+I sistemi di videosorveglianza sono sempre più diffusi nelle aree urbane, ma l'identificazione manuale di cani potenzialmente randagi richiede risorse umane considerevoli. Un sistema automatizzato di riconoscimento potrebbe:
+\begin{itemize}
+    \item Ridurre i tempi di intervento per il recupero di animali in difficoltà
+    \item Ottimizzare le risorse delle autorità competenti
+    \item Facilitare il ricongiungimento di cani smarriti con i proprietari
+    \item Monitorare le aree a maggior rischio di abbandono
+\end{itemize}
+
+\subsection{Obiettivi del Progetto}
+
+Gli obiettivi principali di questo progetto sono:
+\begin{enumerate}
+    \item Sviluppare un sistema di classificazione multi-modale per identificare lo stato di abbandono dei cani
+    \item Implementare un approccio di weak supervision per la classificazione della postura
+    \item Creare un'interfaccia utente che simuli un sistema CCTV per il monitoraggio real-time
+    \item Validare l'approccio con metriche quantitative appropriate
+\end{enumerate}
+
+\subsection{Contributi Principali}
+
+I contributi originali di questo lavoro includono:
+\begin{enumerate}
+    \item \textbf{Architettura Ensemble Multi-modale}: Combinazione di quattro classificatori specializzati con fusione pesata
+    \item \textbf{Weak Supervision per Pose Classification}: Utilizzo dell'origine del dataset come supervisione implicita, evitando annotazioni manuali costose
+    \item \textbf{Stray Index}: Metrica unificata per quantificare la probabilità di abbandono
+    \item \textbf{Sistema CCTV Simulato}: Interfaccia web per dimostrazione e testing
+\end{enumerate}
+
+% ============================================
+% SEZIONE 2: LAVORI CORRELATI
+% ============================================
+
+\section{Lavori Correlati}
+\label{sec:lavori_correlati}
+
+\subsection{Object Detection per Animali}
+
+La detection di animali \`e un problema ben studiato nel campo della computer vision. I modelli della famiglia YOLO \cite{redmon2016yolo} hanno dimostrato eccellenti performance per la detection in tempo reale. In particolare, YOLO11 \cite{ultralytics2024} introduce il supporto nativo per pose estimation, permettendo l'estrazione di keypoints anatomici.
+
+\subsection{Pose Estimation}
+
+La stima della postura negli animali presenta sfide uniche rispetto agli esseri umani, principalmente a causa della maggiore variabilit\`a anatomica tra le specie \cite{cao2019openpose}. Recenti lavori hanno adattato tecniche di human pose estimation per gli animali quadrupedi \cite{mathis2018deeplabcut}.
+
+\subsection{Weak Supervision}
+
+Il paradigma della weak supervision \cite{ratner2017snorkel} permette di addestrare modelli con supervisione indiretta o rumorosa. Nel nostro caso, sfruttiamo la provenienza delle immagini (dataset di cani randagi vs padronali) come forma di supervisione implicita.
+
+% ============================================
+% SEZIONI DETTAGLIATE (da file esterni)
+% ============================================
+
+\input{sections/02_architettura}
+\input{sections/03_backbone}
+\input{sections/04_collar}
+\input{sections/05_skin}
+\input{sections/06_pose}
+\input{sections/07_breed}
+\input{sections/08_fusion}
+\input{sections/09_risultati}
+
+% ============================================
+% SEZIONE 10: IMPLEMENTAZIONE
+% ============================================
+
+\section{Implementazione}
+\label{sec:implementazione}
+
+\subsection{Stack Tecnologico}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Componente} & \textbf{Tecnologia} \\
+\midrule
+Backend & Flask 3.0 + Flask-SocketIO \\
+Frontend & React 18 + Vite + TailwindCSS \\
+ML Framework & PyTorch + Ultralytics \\
+Real-time & WebSocket (Socket.IO) \\
+Database & SQLite (alert storage) \\
+\bottomrule
+\end{tabular}
+\caption{Stack tecnologico del sistema}
+\end{table}
+
+\subsection{Backend Flask}
+
+Il backend implementa:
+\begin{itemize}
+    \item REST API per upload e analisi immagini
+    \item WebSocket per streaming real-time
+    \item Sistema di alert con cooldown
+    \item Persistenza degli alert su SQLite
+\end{itemize}
+
+\subsection{Frontend React}
+
+L'interfaccia utente include:
+\begin{itemize}
+    \item Grid 2x2 di telecamere simulate
+    \item Overlay con bounding box e Stray Index
+    \item Pannello alert real-time
+    \item Statistiche live (detections, avg SI, etc.)
+\end{itemize}
+
+% ============================================
+% SEZIONE 11: PERCORSO DI SVILUPPO
+% ============================================
+
+\section{Il Percorso di Sviluppo}
+\label{sec:percorso}
+
+Questa sezione documenta il percorso iterativo seguito durante lo sviluppo di ResQPet, evidenziando le sfide affrontate, le soluzioni adottate e le lezioni apprese.
+
+\subsection{Fase 1: La Sfida dei Dati}
+
+Il primo ostacolo significativo \`e emerso con il Collar Detector. Il dataset iniziale (Roboflow ``Dog with Leash'') conteneva solo 152 immagini, producendo un modello con mAP del 51\% --- completamente inadeguato per un'applicazione reale.
+
+\paragraph{Il problema:} I dataset pubblici per la detection di collari/guinzagli erano scarsi e di bassa qualit\`a. Le alternative erano:
+\begin{enumerate}
+    \item Cercare altri dataset pubblici (risultato: nessuno adeguato)
+    \item Annotare manualmente migliaia di immagini (costo proibitivo)
+    \item Costruire una soluzione custom
+\end{enumerate}
+
+\paragraph{La soluzione:} Abbiamo sviluppato una \textbf{piattaforma di labeling web} con approccio \textit{human-in-the-loop}:
+\begin{itemize}
+    \item Il modello v1 (seppur scadente) generava pre-annotazioni automatiche
+    \item Gli annotatori umani dovevano solo \textit{verificare e correggere}, non annotare da zero
+    \item Sistema multi-utente per parallelizzare il lavoro
+\end{itemize}
+
+\paragraph{Risultato:} Da 152 a 7,576 immagini annotate, con un miglioramento del \textbf{67\%} sul mAP (da 0.51 a 0.853). La lezione chiave: \textit{investire nei dati paga pi\`u che complicare il modello}.
+
+\subsection{Fase 2: L'Intuizione della Weak Supervision}
+
+La classificazione della postura presentava una sfida diversa: come definire oggettivamente una ``postura da randagio''?
+
+\paragraph{Il problema:} L'annotazione manuale della postura \`e intrinsecamente soggettiva. Annotatori diversi avrebbero prodotto label inconsistenti, e il costo sarebbe stato elevato per migliaia di pose.
+
+\paragraph{L'intuizione:} Invece di annotare \textit{come} appare una postura, sfruttiamo \textit{da dove} proviene l'immagine:
+\begin{itemize}
+    \item I cani nel FYP Dataset sono randagi \textit{per definizione}
+    \item I cani in Stanford Dogs sono in contesti domestici/esposizioni
+    \item L'origine del dataset diventa il label
+\end{itemize}
+
+\paragraph{Validazione:} L'approccio ha prodotto un AUC-ROC di 0.78, dimostrando che il segnale \`e informativo nonostante il label noise intrinseco. La weak supervision ha permesso di creare un dataset di oltre 30,000 keypoints senza alcuna annotazione manuale.
+
+\subsection{Fase 3: Integrazione e Bilanciamento}
+
+L'ultima sfida \`e stata combinare i quattro classificatori in modo bilanciato.
+
+\paragraph{Il problema:} Come pesare indicatori con affidabilit\`a diverse? Il collar detector (mAP 85\%) \`e pi\`u affidabile del pose classifier (AUC 78\%), ma entrambi forniscono informazioni utili.
+
+\paragraph{La soluzione:} Pesi empirici basati su:
+\begin{itemize}
+    \item \textbf{Collar (35\%)}: Indicatore pi\`u diretto e affidabile
+    \item \textbf{Pose (25\%)}: Informativo ma rumoroso (weak supervision)
+    \item \textbf{Skin (20\%)}: Indicatore di trascuratezza
+    \item \textbf{Breed (20\%)}: Prior statistici di supporto
+\end{itemize}
+
+La somma pesata produce uno Stray Index continuo che permette di gestire l'incertezza attraverso soglie configurabili.
+
+\subsection{Lezioni Apprese}
+
+\begin{enumerate}
+    \item \textbf{Dati $>$ Modello}: Lo stesso YOLOv8n con 50$\times$ pi\`u dati ha migliorato del 67\%. La qualit\`a dei dati \`e pi\`u importante della complessit\`a del modello.
+
+    \item \textbf{Human-in-the-loop}: Combinare automazione (pre-labeling) e supervisione umana (verifica) \`e pi\`u efficiente dell'annotazione manuale pura.
+
+    \item \textbf{Weak supervision funziona}: Con assunzioni ragionevoli sulla provenienza dei dati, si possono ottenere risultati utili senza annotazione manuale.
+
+    \item \textbf{Iterazione}: Il ``fallimento'' del collar v1 ha accelerato la creazione del dataset v2 attraverso il pre-labeling. I fallimenti sono parte del processo.
+
+    \item \textbf{Trasparenza}: Uno Stray Index continuo \`e pi\`u utile di una classificazione binaria, perch\'e permette di calibrare il trade-off tra falsi positivi e negativi.
+\end{enumerate}
+
+% ============================================
+% SEZIONE 12: DISCUSSIONE
+% ============================================
+
+\section{Discussione}
+\label{sec:discussione}
+
+\subsection{Punti di Forza}
+\begin{itemize}
+    \item Architettura modulare e estendibile
+    \item Approccio weak supervision innovativo per pose classification
+    \item \textbf{Piattaforma di labeling custom}: Sviluppata per creare il dataset collar v2 (50$\times$ pi\`u dati)
+    \item \textbf{Human-in-the-loop}: Pre-labeling automatico + revisione umana per dataset di qualit\`a
+    \item Interfaccia utente intuitiva
+    \item Pipeline end-to-end funzionante con 28 FPS su GPU
+\end{itemize}
+
+\subsection{Limitazioni}
+\begin{itemize}
+    \item Breed priors basati su stime, non su dati reali italiani
+    \item Performance dipendente dalla qualit\`a delle immagini
+    \item Assumption che la postura sia correlata allo stato di abbandono
+    \item Validazione umana limitata a 133 immagini (da estendere)
+\end{itemize}
+
+\subsection{Sviluppi Futuri}
+\begin{itemize}
+    \item Integrazione con database nazionali di cani smarriti
+    \item Supporto per stream video reali
+    \item Aggiunta di facial recognition per re-identificazione
+    \item Validazione su dati reali da canili
+\end{itemize}
+
+% ============================================
+\section{Conclusioni}
+% ============================================
+
+Questo lavoro ha presentato ResQPet, un sistema di identificazione automatizzata dello stato di abbandono nei cani. Il contributo principale è l'introduzione di un approccio di weak supervision per la classificazione della postura, che elimina la necessità di annotazione manuale sfruttando l'origine dei dataset.
+
+Il sistema combina quattro classificatori specializzati attraverso una fusione pesata, producendo uno Stray Index che quantifica la probabilità di abbandono. L'implementazione include un'interfaccia web che simula un sistema CCTV per il monitoraggio real-time.
+
+I risultati preliminari mostrano la fattibilità dell'approccio, sebbene siano necessarie ulteriori validazioni su dati reali per confermare l'efficacia del sistema in scenari operativi.
+
+% ============================================
+% Bibliography
+% ============================================
+
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+% ============================================
+\appendix
+\section{Appendice A: Dettagli Dataset}
+% ============================================
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllll}
+\toprule
+\textbf{Dataset} & \textbf{Immagini} & \textbf{Classi} & \textbf{Fonte} & \textbf{Uso} \\
+\midrule
+Dog-Pose & 8,476 & 1 + 24kpt & Ultralytics & Backbone \\
+Collar (v2) & 7,576 & 2 & Labeling Platform & Collar Detector \\
+Dog's Skin Diseases & 4,315 & 6 & Kaggle & Skin Classifier \\
+Stanford Dogs & $\sim$20,000 & 120 & Stanford & Breed + Labeling \\
+FYP Stray Dogs & $\sim$20,000 & 4 & Custom & Pose Classifier \\
+\bottomrule
+\end{tabular}
+\caption{Riepilogo dataset utilizzati. Il dataset Collar v2 \`e stato creato attraverso la piattaforma di labeling custom.}
+\end{table}
+
+% ============================================
+\section{Appendice B: Hyperparameters}
+% ============================================
+
+\subsection{Backbone YOLO11 Dog-Pose v2}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Epochs & 150 \\
+Batch size & 16 \\
+Image size & 640$\times$640 \\
+Optimizer & AdamW \\
+LR iniziale & 0.001 \\
+LR finale & 0.01 \\
+Weight decay & 0.0005 \\
+Early stopping & 20 epochs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Collar Detector v2}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Epochs & 100 \\
+Batch size & 128 (64/GPU) \\
+Image size & 640$\times$640 \\
+Optimizer & AdamW \\
+LR iniziale & 0.001 \\
+Device & 2$\times$ RTX 5090 \\
+Mixed Precision & FP16 \\
+Augmentation & Mosaic, MixUp, HSV, Flip \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================
+\section{Appendice C: Guida Installazione}
+% ============================================
+
+\begin{lstlisting}[language=bash]
+# Clone repository
+git clone https://github.com/user/resqpet.git
+cd resqpet
+
+# Backend setup
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Frontend setup
+cd ../frontend
+npm install
+
+# Run application
+# Terminal 1: Backend
+cd backend && python -m app.main
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+\end{lstlisting}
+
+\end{document}

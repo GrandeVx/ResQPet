@@ -1,0 +1,38 @@
+% Fusion Module - Weighted Sum
+\begin{tikzpicture}[
+    node distance=1cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=0.7cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Inputs with weights
+\node[box, fill=blue!30] (collar) {Collar: $P_{nc}$};
+\node[below=0.1cm of collar, font=\scriptsize] {peso: 35\%};
+
+\node[box, fill=green!30, below=1cm of collar] (skin) {Skin: $P_{sick}$};
+\node[below=0.1cm of skin, font=\scriptsize] {peso: 25\%};
+
+\node[box, fill=orange!30, below=1cm of skin] (pose) {Pose: $P_{stray}$};
+\node[below=0.1cm of pose, font=\scriptsize] {peso: 15\%};
+
+\node[box, fill=purple!30, below=1cm of pose] (breed) {Breed: $P_{stray}$};
+\node[below=0.1cm of breed, font=\scriptsize] {peso: 10\%};
+
+\node[box, fill=gray!30, below=1cm of breed] (context) {Context: $P_{ctx}$};
+\node[below=0.1cm of context, font=\scriptsize] {peso: 15\%};
+
+% Fusion
+\node[box, fill=red!20, right=3cm of skin, minimum width=3cm, minimum height=1.2cm] (fusion) {Weighted Sum\\$\sum w_i \cdot P_i$};
+
+% Output
+\node[box, fill=red!40, right=2cm of fusion, minimum width=2.5cm] (output) {Stray Index\\$SI \in [0,1]$};
+
+% Arrows
+\draw[arrow] (collar.east) -- ++(0.5,0) |- (fusion.west);
+\draw[arrow] (skin.east) -- (fusion.west);
+\draw[arrow] (pose.east) -- ++(0.5,0) |- (fusion.west);
+\draw[arrow] (breed.east) -- ++(1,0) |- (fusion.west);
+\draw[arrow] (context.east) -- ++(1.5,0) |- (fusion.west);
+\draw[arrow] (fusion) -- (output);
+
+\end{tikzpicture}

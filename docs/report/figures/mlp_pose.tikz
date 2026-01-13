@@ -1,0 +1,52 @@
+% MLP Architecture for Pose Classifier
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    neuron/.style={circle, draw, minimum size=0.4cm, fill=blue!20},
+    layer/.style={rectangle, draw, rounded corners, minimum width=1cm, minimum height=2.5cm, fill=gray!10},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Input layer
+\node[layer, minimum height=3cm] (input) {};
+\node[above=0.1cm of input, font=\small\bfseries] {Input};
+\node[below=0.1cm of input, font=\scriptsize] {72};
+\foreach \i in {1,...,5} {
+    \node[neuron] at ($(input.center) + (0, 1.2-0.5*\i)$) {};
+}
+\node at ($(input.center) + (0, -0.8)$) {$\vdots$};
+
+% Hidden 1
+\node[layer, right=1.5cm of input, minimum height=2.5cm] (h1) {};
+\node[above=0.1cm of h1, font=\small\bfseries] {Hidden 1};
+\node[below=0.1cm of h1, font=\scriptsize] {128};
+\foreach \i in {1,...,4} {
+    \node[neuron, fill=green!30] at ($(h1.center) + (0, 0.9-0.5*\i)$) {};
+}
+\node at ($(h1.center) + (0, -0.6)$) {$\vdots$};
+
+% Hidden 2
+\node[layer, right=1.5cm of h1, minimum height=2cm] (h2) {};
+\node[above=0.1cm of h2, font=\small\bfseries] {Hidden 2};
+\node[below=0.1cm of h2, font=\scriptsize] {64};
+\foreach \i in {1,...,3} {
+    \node[neuron, fill=orange!30] at ($(h2.center) + (0, 0.6-0.5*\i)$) {};
+}
+\node at ($(h2.center) + (0, -0.5)$) {$\vdots$};
+
+% Output
+\node[layer, right=1.5cm of h2, minimum height=1cm, minimum width=0.8cm] (output) {};
+\node[above=0.1cm of output, font=\small\bfseries] {Output};
+\node[below=0.1cm of output, font=\scriptsize] {1};
+\node[neuron, fill=red!30] at (output.center) {};
+
+% Connections (simplified)
+\draw[arrow, gray] (input.east) -- (h1.west);
+\draw[arrow, gray] (h1.east) -- (h2.west);
+\draw[arrow, gray] (h2.east) -- (output.west);
+
+% Activations
+\node[below=0.8cm of h1, font=\scriptsize] {ReLU};
+\node[below=0.8cm of h2, font=\scriptsize] {ReLU};
+\node[below=0.5cm of output, font=\scriptsize] {Sigmoid};
+
+\end{tikzpicture}

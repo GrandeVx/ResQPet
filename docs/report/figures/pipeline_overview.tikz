@@ -1,0 +1,48 @@
+% Pipeline Overview - ResQPet System Architecture
+\begin{tikzpicture}[
+    node distance=1.2cm and 1.8cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2cm, minimum height=0.9cm, align=center, fill=blue!10},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Input
+\node[box, fill=green!20] (input) {Frame\\Input};
+
+% Backbone
+\node[box, right=of input] (backbone) {Backbone\\YOLO11};
+
+% Classifiers - disposti verticalmente con maggiore spaziatura
+\node[box, right=2.2cm of backbone, yshift=2.4cm] (collar) {Collar\\Detector};
+\node[box, right=2.2cm of backbone, yshift=0.8cm] (skin) {Skin\\Classifier};
+\node[box, right=2.2cm of backbone, yshift=-0.8cm] (pose) {Pose\\Classifier};
+\node[box, right=2.2cm of backbone, yshift=-2.4cm] (breed) {Breed\\Classifier};
+
+% Fusion
+\node[box, right=2cm of skin, yshift=-0.5cm, fill=orange!20] (fusion) {Fusion\\Module};
+
+% Output
+\node[box, right=of fusion, fill=red!20] (output) {Stray\\Index};
+
+% Arrows from input to backbone
+\draw[arrow] (input) -- (backbone);
+
+% Arrows from backbone to classifiers
+\draw[arrow] (backbone.east) -- ++(0.5,0) |- (collar.west);
+\draw[arrow] (backbone.east) -- ++(0.5,0) |- (skin.west);
+\draw[arrow] (backbone.east) -- ++(0.5,0) |- (pose.west);
+\draw[arrow] (backbone.east) -- ++(0.5,0) |- (breed.west);
+
+% Arrows from classifiers to fusion
+\draw[arrow] (collar.east) -| (fusion.north);
+\draw[arrow] (skin.east) -- (fusion.west |- skin.east) -- (fusion.west);
+\draw[arrow] (pose.east) -- (fusion.west |- pose.east) -- (fusion.west);
+\draw[arrow] (breed.east) -| (fusion.south);
+
+% Arrow from fusion to output
+\draw[arrow] (fusion) -- (output);
+
+% Labels
+\node[below=0.2cm of backbone, font=\scriptsize] {ROI + Keypoints};
+\node[above=0.1cm of fusion, font=\scriptsize] {Weighted Sum};
+
+\end{tikzpicture}
