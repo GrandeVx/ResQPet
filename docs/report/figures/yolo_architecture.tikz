@@ -1,0 +1,35 @@
+% YOLO11 Architecture for Dog Pose Estimation
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2cm, minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Backbone
+\node[box, fill=blue!20] (input) {Input\\640$\times$640};
+\node[box, fill=blue!30, right=of input] (csp) {CSPDarknet\\Backbone};
+
+% Neck
+\node[box, fill=green!20, right=of csp] (panet) {PANet\\Neck};
+
+% Heads
+\node[box, fill=orange!20, above right=0.5cm and 1cm of panet] (det) {Detection\\Head};
+\node[box, fill=red!20, below right=0.5cm and 1cm of panet] (pose) {Pose\\Head};
+
+% Outputs
+\node[box, fill=gray!20, right=of det] (bbox) {BBox\\+ Conf};
+\node[box, fill=gray!20, right=of pose] (kpts) {24 Keypoints\\(x,y,v)};
+
+% Arrows
+\draw[arrow] (input) -- (csp);
+\draw[arrow] (csp) -- (panet);
+\draw[arrow] (panet) -- (det);
+\draw[arrow] (panet) -- (pose);
+\draw[arrow] (det) -- (bbox);
+\draw[arrow] (pose) -- (kpts);
+
+% Feature pyramids
+\node[below=0.2cm of csp, font=\scriptsize] {Multi-scale features};
+\node[below=0.2cm of panet, font=\scriptsize] {Feature fusion};
+
+\end{tikzpicture}

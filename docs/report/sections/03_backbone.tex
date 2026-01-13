@@ -1,0 +1,193 @@
+% ============================================
+% SEZIONE 3: YOLO11 DOG-POSE BACKBONE
+% ============================================
+
+\section{YOLO11 Dog-Pose Backbone}
+\label{sec:backbone}
+
+\subsection{Ruolo nel Sistema}
+
+Il backbone rappresenta il primo stadio della pipeline e ha il compito critico di:
+\begin{itemize}
+    \item \textbf{Rilevare} tutti i cani presenti nel frame
+    \item \textbf{Localizzare} ciascun cane con una bounding box precisa
+    \item \textbf{Estrarre} 24 keypoints anatomici per l'analisi della postura
+\end{itemize}
+
+A differenza del modello YOLO11-pose standard (trainato per pose estimation umana con 17 keypoints), il nostro backbone \`e specializzato per la detection di cani con 24 punti anatomici specifici.
+
+\subsection{Architettura YOLO11}
+
+YOLO11 (You Only Look Once, versione 11) \`e l'ultima evoluzione della famiglia YOLO, sviluppata da Ultralytics. L'architettura si compone di tre blocchi principali:
+
+\begin{figure}[H]
+    \centering
+    \input{figures/yolo_architecture.tikz}
+    \caption{Architettura semplificata di YOLO11 per pose estimation. Il backbone CSPDarknet estrae features multi-scala, il neck PANet fonde le informazioni, e le head producono detection e keypoints.}
+    \label{fig:yolo}
+\end{figure}
+
+\subsubsection{Backbone: CSPDarknet}
+Estrae features gerarchiche dall'immagine di input attraverso una serie di blocchi convoluzionali con connessioni cross-stage partial (CSP). Produce feature maps a multiple risoluzioni.
+
+\subsubsection{Neck: PANet (Path Aggregation Network)}
+Fonde le feature maps provenienti da diversi livelli del backbone, permettendo al modello di rilevare oggetti di dimensioni variabili. Utilizza connessioni top-down e bottom-up.
+
+\subsubsection{Head: Detection + Pose}
+Due head parallele producono:
+\begin{itemize}
+    \item \textbf{Detection Head}: Bounding boxes con classe e confidence
+    \item \textbf{Pose Head}: Keypoints con coordinate $(x, y)$ e visibility score
+\end{itemize}
+
+\subsection{Keypoints Anatomici (24 Punti)}
+
+Il modello estrae 24 keypoints specifici per l'anatomia canina, suddivisi in regioni corporee:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{clcl}
+\toprule
+\textbf{ID} & \textbf{Nome} & \textbf{ID} & \textbf{Nome} \\
+\midrule
+0 & nose & 12 & right\_front\_knee \\
+1 & left\_eye & 13 & left\_front\_paw \\
+2 & right\_eye & 14 & right\_front\_paw \\
+3 & left\_ear\_base & 15 & left\_back\_elbow \\
+4 & right\_ear\_base & 16 & right\_back\_elbow \\
+5 & left\_ear\_tip & 17 & left\_back\_knee \\
+6 & right\_ear\_tip & 18 & right\_back\_knee \\
+7 & throat & 19 & left\_back\_paw \\
+8 & withers (garrese) & 20 & right\_back\_paw \\
+9 & left\_front\_elbow & 21 & tail\_start \\
+10 & right\_front\_elbow & 22 & tail\_end \\
+11 & left\_front\_knee & 23 & chin \\
+\bottomrule
+\end{tabular}
+\caption{Elenco completo dei 24 keypoints anatomici estratti dal modello Dog-Pose.}
+\label{tab:keypoints}
+\end{table}
+
+Ogni keypoint \`e rappresentato da una tripla $(x, y, v)$ dove:
+\begin{itemize}
+    \item $x, y$: coordinate in pixel nel frame originale
+    \item $v \in [0, 1]$: visibility score (1 = visibile, 0 = occluso/non rilevato)
+\end{itemize}
+
+\subsection{Dataset Dog-Pose}
+
+Il modello viene trainato sul dataset Dog-Pose fornito da Ultralytics, specificamente progettato per pose estimation canina.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Propriet\`a} & \textbf{Valore} \\
+\midrule
+Immagini Training & 6,773 \\
+Immagini Test & 1,703 \\
+Classi & 1 (Dog) \\
+Keypoints per istanza & 24 \\
+Formato annotazioni & YOLO Pose (txt) \\
+Fonte & Ultralytics Hub \\
+\bottomrule
+\end{tabular}
+\caption{Statistiche del dataset Dog-Pose utilizzato per il training del backbone.}
+\label{tab:dogpose_dataset}
+\end{table}
+
+\subsection{Training}
+
+Il training utilizza transfer learning partendo dal modello \texttt{yolo11n-pose.pt} pre-trainato su human pose estimation (17 keypoints umani). Il modello viene adattato alla struttura anatomica canina (24 keypoints).
+
+\subsubsection{Configurazione v2 (Attuale)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametro} & \textbf{Valore} \\
+\midrule
+Modello base & yolo11n-pose.pt \\
+Epochs & 150 \\
+Image size & 640 $\times$ 640 \\
+Batch size & 16 \\
+Optimizer & AdamW \\
+Learning rate iniziale & 0.001 \\
+Learning rate finale & 0.01 \\
+Weight decay & 0.0005 \\
+Early stopping patience & 20 epochs \\
+Device & CUDA (single GPU) \\
+\bottomrule
+\end{tabular}
+\caption{Hyperparameters per il training del backbone Dog-Pose v2.}
+\label{tab:backbone_training}
+\end{table}
+
+\subsubsection{Data Augmentation}
+
+Durante il training vengono applicate le seguenti trasformazioni:
+
+\begin{itemize}
+    \item \textbf{Mosaic}: Combina 4 immagini in una sola (prob. 1.0)
+    \item \textbf{MixUp}: Sovrapposizione di due immagini (prob. 0.1)
+    \item \textbf{Rotazione}: $\pm 10$\textdegree
+    \item \textbf{Traslazione}: $\pm 10\%$
+    \item \textbf{Scaling}: $0.5\times$ - $1.5\times$
+    \item \textbf{Horizontal Flip}: 50\%
+    \item \textbf{HSV Augmentation}: Variazioni di hue, saturation, value
+\end{itemize}
+
+\subsection{Output del Modello}
+
+Per ogni frame processato, il backbone ritorna una lista di detection, ciascuna contenente:
+
+\begin{lstlisting}[style=python, caption={Struttura output del backbone per ogni cane rilevato}]
+detection = {
+    'bbox': [x1, y1, x2, y2],     # Bounding box in pixel
+    'confidence': 0.92,           # Confidence detection
+    'keypoints': np.array(24, 3), # 24 keypoints (x, y, visibility)
+    'roi': np.ndarray,            # Immagine croppata
+    'class_id': 0                 # Sempre 0 (dog)
+}
+\end{lstlisting}
+
+\subsection{Normalizzazione Keypoints}
+
+Prima di essere passati al Pose Classifier, i keypoints vengono normalizzati rispetto alla bounding box per renderli invarianti a scala e posizione:
+
+\begin{lstlisting}[style=python, caption={Normalizzazione keypoints rispetto alla bounding box}]
+def normalize_keypoints(keypoints, bbox):
+    x1, y1, x2, y2 = bbox
+    w, h = x2 - x1, y2 - y1
+
+    normalized = keypoints.copy()
+    normalized[:, 0] = (keypoints[:, 0] - x1) / w  # x in [0, 1]
+    normalized[:, 1] = (keypoints[:, 1] - y1) / h  # y in [0, 1]
+    # visibility rimane invariato
+
+    return normalized  # Shape: (24, 3)
+\end{lstlisting}
+
+\subsection{Risultati v2}
+
+Il training v2 con 150 epochs ha prodotto risultati eccellenti, superando significativamente i target prefissati.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metrica} & \textbf{Target} & \textbf{Ottenuto (v2)} \\
+\midrule
+mAP@0.5 & $> 0.85$ & \textbf{0.987} \\
+Precision & $> 0.90$ & \textbf{0.969} \\
+Recall & $> 0.90$ & \textbf{0.977} \\
+Inference time (GPU) & $< 20$ms & $\sim 8$ms \\
+\bottomrule
+\end{tabular}
+\caption{Metriche del backbone Dog-Pose v2 (150 epochs). Il modello raggiunge una mAP@0.5 del 98.7\%.}
+\label{tab:backbone_metrics}
+\end{table}
+
+\paragraph{Analisi:} L'elevata precision (96.9\%) indica che quasi tutte le detection sono corrette, mentre l'alto recall (97.7\%) significa che il modello rileva quasi tutti i cani presenti nel frame. Questo \`e fondamentale per il sistema ResQPet, dove ogni cane deve essere analizzato.
