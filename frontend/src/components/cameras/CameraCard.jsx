@@ -13,8 +13,9 @@ export function CameraCard({ camera, socket, onExpand, isExpanded = false }) {
   const [hasError, setHasError] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
 
-  // Detection state
+  // Detection state - real-time
   const [lastDetection, setLastDetection] = useState(null)
+  const [allDetections, setAllDetections] = useState([])
   const [detectionCount, setDetectionCount] = useState(0)
 
   // Start video playback
@@ -47,20 +48,28 @@ export function CameraCard({ camera, socket, onExpand, isExpanded = false }) {
     }
   }, [camera.video_url, camera.id])
 
-  // Listen for detection results from backend
+  // Listen for detection results from backend - REAL-TIME updates
   useEffect(() => {
     if (!socket) return
 
     const handleDetectionResult = (data) => {
-      if (data.camera_id === camera.id && data.detections?.length > 0) {
-        setDetectionCount(data.detections.length)
-        setLastDetection(data.detections[0])
-
-        // Clear detection overlay after 3 seconds
-        setTimeout(() => {
-          setLastDetection(null)
+      if (data.camera_id === camera.id) {
+        // Update in real-time: show all detections from current frame
+        if (data.detections?.length > 0) {
+          setDetectionCount(data.detections.length)
+          // Store ALL detections, not just the first one
+          setAllDetections(data.detections)
+          // Keep the "best" detection (highest stray_index) for main display
+          const bestDetection = data.detections.reduce((best, curr) =>
+            (curr.stray_index || 0) > (best.stray_index || 0) ? curr : best
+          , data.detections[0])
+          setLastDetection(bestDetection)
+        } else {
+          // No detections in this frame - clear overlay
           setDetectionCount(0)
-        }, 3000)
+          setLastDetection(null)
+          setAllDetections([])
+        }
       }
     }
 
@@ -111,11 +120,15 @@ export function CameraCard({ camera, socket, onExpand, isExpanded = false }) {
         intervalRef.current = null
       }
       setIsAnalyzing(false)
+      // Clear detections when stopping
+      setAllDetections([])
+      setLastDetection(null)
+      setDetectionCount(0)
     } else {
-      // Start analysis - capture frame every 500ms (2 FPS)
+      // Start analysis - capture frame every 2000ms (0.5 FPS) for stability
       setIsAnalyzing(true)
       captureAndSendFrame() // Capture immediately
-      intervalRef.current = setInterval(captureAndSendFrame, 500)
+      intervalRef.current = setInterval(captureAndSendFrame, 2000)
     }
   }
 
@@ -128,8 +141,9 @@ export function CameraCard({ camera, socket, onExpand, isExpanded = false }) {
     }
   }, [])
 
-  const hasStrayAlert = lastDetection?.stray_index >= 0.7
-  const hasWarning = lastDetection?.stray_index >= 0.3 && lastDetection?.stray_index < 0.7
+  // Check if ANY detection is a stray or warning (real-time)
+  const hasStrayAlert = allDetections.some(d => d.stray_index >= 0.7)
+  const hasWarning = !hasStrayAlert && allDetections.some(d => d.stray_index >= 0.3)
 
   return (
     <div
@@ -223,25 +237,33 @@ export function CameraCard({ camera, socket, onExpand, isExpanded = false }) {
           </div>
         </div>
 
-        {/* Detection overlay */}
-        {lastDetection && (
-          <div className="absolute top-14 right-3 bg-black/80 backdrop-blur-sm rounded-xl p-3 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <Dog className="h-6 w-6 text-white" />
-              <div>
-                <p className="text-xs text-white font-medium">
-                  {detectionCount} cane{detectionCount !== 1 ? 'i' : ''} rilevato{detectionCount !== 1 ? 'i' : ''}
-                </p>
-                <StrayIndexBadge
-                  strayIndex={lastDetection.stray_index}
-                  status={lastDetection.status}
-                />
-                {lastDetection.breed && (
-                  <p className="text-xs text-surface-400 mt-1">
-                    Razza: {lastDetection.breed}
-                  </p>
-                )}
-              </div>
+        {/* Detection overlay - REAL-TIME */}
+        {allDetections.length > 0 && (
+          <div className="absolute top-14 right-3 bg-black/80 backdrop-blur-sm rounded-xl p-3 max-w-[200px] max-h-[200px] overflow-y-auto">
+            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/20">
+              <Dog className="h-5 w-5 text-white" />
+              <p className="text-xs text-white font-bold">
+                {detectionCount} cane{detectionCount !== 1 ? 'i' : ''} rilevato{detectionCount !== 1 ? 'i' : ''}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {allDetections.map((det, idx) => (
+                <div key={idx} className={clsx(
+                  'p-2 rounded-lg',
+                  det.stray_index >= 0.7 ? 'bg-danger/30' :
+                  det.stray_index >= 0.3 ? 'bg-warning/30' : 'bg-success/30'
+                )}>
+                  <StrayIndexBadge
+                    strayIndex={det.stray_index}
+                    status={det.status}
+                  />
+                  {det.breed && (
+                    <p className="text-xs text-surface-300 mt-1 truncate">
+                      {det.breed}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}

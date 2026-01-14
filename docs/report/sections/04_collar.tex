@@ -327,27 +327,3 @@ Lo sviluppo del Collar Detector evidenzia principi fondamentali del deep learnin
 
     \item \textbf{Multi-GPU scaling}: Batch size maggiore (128 vs 8) ha ridotto il training da 1h a 20min
 \end{enumerate}
-
-\subsection{Fallback Heuristic}
-
-Nel caso il modello non sia disponibile, viene utilizzata un'euristica basata sull'analisi del colore nella regione del collo:
-
-\begin{lstlisting}[style=python, caption={Euristica fallback per detection collare}]
-def heuristic_collar_detection(roi):
-    # Estrai regione collo (1/3 superiore)
-    h, w = roi.shape[:2]
-    neck_region = roi[0:h//3, :]
-
-    # Converti in HSV
-    hsv = cv2.cvtColor(neck_region, cv2.COLOR_BGR2HSV)
-
-    # Cerca colori saturi (tipici di collari)
-    saturation = hsv[:, :, 1]
-    high_saturation_ratio = (saturation > 100).mean()
-
-    # Collari hanno spesso colori artificiali/saturi
-    if high_saturation_ratio > 0.15:
-        return 0.3  # Probabile collare
-    else:
-        return 0.6  # Probabilmente senza
-\end{lstlisting}
