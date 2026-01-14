@@ -134,6 +134,7 @@ I contributi originali di questo lavoro includono:
     \item \textbf{Weak Supervision per Pose Classification}: Utilizzo dell'origine del dataset come supervisione implicita, evitando annotazioni manuali costose
     \item \textbf{Stray Index}: Metrica unificata per quantificare la probabilità di abbandono
     \item \textbf{Sistema CCTV Simulato}: Interfaccia web per dimostrazione e testing
+    \item \textbf{Analisi Explainable AI}: Validazione dei modelli con tecniche XAI e identificazione di dataset bias
 \end{enumerate}
 
 % ============================================
@@ -167,9 +168,10 @@ Il paradigma della weak supervision \cite{ratner2017snorkel} permette di addestr
 \input{sections/07_breed}
 \input{sections/08_fusion}
 \input{sections/09_risultati}
+\input{sections/10_explainability}
 
 % ============================================
-% SEZIONE 10: IMPLEMENTAZIONE
+% SEZIONE 11: IMPLEMENTAZIONE
 % ============================================
 
 \section{Implementazione}
@@ -214,7 +216,7 @@ L'interfaccia utente include:
 \end{itemize}
 
 % ============================================
-% SEZIONE 11: PERCORSO DI SVILUPPO
+% SEZIONE 12: PERCORSO DI SVILUPPO
 % ============================================
 
 \section{Il Percorso di Sviluppo}
@@ -288,7 +290,7 @@ La somma pesata produce uno Stray Index continuo che permette di gestire l'incer
 \end{enumerate}
 
 % ============================================
-% SEZIONE 12: DISCUSSIONE
+% SEZIONE 13: DISCUSSIONE
 % ============================================
 
 \section{Discussione}
@@ -310,6 +312,7 @@ La somma pesata produce uno Stray Index continuo che permette di gestire l'incer
     \item Performance dipendente dalla qualit\`a delle immagini
     \item Assumption che la postura sia correlata allo stato di abbandono
     \item Validazione umana limitata a 133 immagini (da estendere)
+    \item \textbf{Dataset bias nel Collar Detector}: L'analisi XAI (Sezione~\ref{sec:collar_bias}) ha rivelato che il modello presta attenzione allo sfondo invece che alla regione del collare, suggerendo correlazioni spurie nel dataset di training
 \end{itemize}
 
 \subsection{Sviluppi Futuri}
@@ -318,6 +321,7 @@ La somma pesata produce uno Stray Index continuo che permette di gestire l'incer
     \item Supporto per stream video reali
     \item Aggiunta di facial recognition per re-identificazione
     \item Validazione su dati reali da canili
+    \item \textbf{Mitigazione dataset bias}: Ribilanciamento del dataset Collar con maggiore variet\`a di sfondi e tecniche di augmentation mirate
 \end{itemize}
 
 % ============================================
