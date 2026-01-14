@@ -1,0 +1,81 @@
+{
+  "cameras": [
+    {
+      "id": "cam_01",
+      "name": "Parco Villa Comunale",
+      "location": { "lat": 40.6824, "lng": 14.7681 },
+      "video_url": "/static/demo/videos/cam_01.mp4",
+      "status": "active",
+      "zone": "Centro Storico"
+    },
+    {
+      "id": "cam_02",
+      "name": "Lungomare Trieste",
+      "location": { "lat": 40.6756, "lng": 14.7594 },
+      "video_url": "/static/demo/videos/cam_02.mp4",
+      "status": "active",
+      "zone": "Lungomare"
+    },
+    {
+      "id": "cam_03",
+      "name": "Piazza Portanova",
+      "location": { "lat": 40.6789, "lng": 14.7623 },
+      "video_url": "/static/demo/videos/cam_03.mp4",
+      "status": "active",
+      "zone": "Centro"
+    },
+    {
+      "id": "cam_04",
+      "name": "Stazione Centrale",
+      "location": { "lat": 40.6752, "lng": 14.7710 },
+      "video_url": "/static/demo/videos/cam_04.mp4",
+      "status": "active",
+      "zone": "Stazione"
+    },
+    {
+      "id": "cam_05",
+      "name": "Corso Vittorio Emanuele",
+      "location": { "lat": 40.6801, "lng": 14.7645 },
+      "video_url": "/static/demo/videos/cam_05.mp4",
+      "status": "active",
+      "zone": "Centro"
+    },
+    {
+      "id": "cam_06",
+      "name": "Campus UNISA",
+      "location": { "lat": 40.7742, "lng": 14.7891 },
+      "video_url": "/static/demo/videos/cam_06.mp4",
+      "status": "active",
+      "zone": "Fisciano"
+    },
+    {
+      "id": "cam_07",
+      "name": "Mercato Comunale",
+      "location": { "lat": 40.6778, "lng": 14.7589 },
+      "video_url": "/static/demo/videos/cam_07.mp4",
+      "status": "active",
+      "zone": "Centro"
+    },
+    {
+      "id": "cam_08",
+      "name": "Parco Pinocchio",
+      "location": { "lat": 40.6891, "lng": 14.7723 },
+      "video_url": "/static/demo/videos/cam_08.mp4",
+      "status": "active",
+      "zone": "Pastena"
+    },
+    {
+      "id": "cam_09",
+      "name": "Porto Turistico",
+      "location": { "lat": 40.6734, "lng": 14.7512 },
+      "video_url": "/static/demo/videos/cam_09.mp4",
+      "status": "active",
+      "zone": "Porto"
+    }
+  ],
+  "default_center": {
+    "lat": 40.6824,
+    "lng": 14.7681
+  },
+  "default_zoom": 13
+}
