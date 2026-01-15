@@ -139,6 +139,56 @@ I contributi originali di questo lavoro includono:
     \item \textbf{Analisi Explainable AI}: Validazione dei modelli con tecniche XAI e identificazione di dataset bias
 \end{enumerate}
 
+\subsection{Specifica dell'Agente: PEAS}
+
+Seguendo la formalizzazione introdotta nel corso \cite{palomba2025fia}, descriviamo il sistema ResQPet secondo il framework PEAS (Performance measure, Environment, Actuators, Sensors):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}p{3cm}p{10cm}@{}}
+\toprule
+\textbf{Componente} & \textbf{Descrizione} \\
+\midrule
+\textbf{Performance Measure} &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textit{Stray Index}: valore continuo in $[0,1]$ che quantifica la probabilit\`a di abbandono
+    \item \textit{Accuratezza}: precision/recall nella detection e classificazione
+    \item \textit{Latenza}: tempo di elaborazione $<50$ms per frame (vincolo real-time)
+    \item \textit{Minimizzazione falsi negativi}: priorit\`a nel non perdere cani randagi
+\end{itemize} \\
+\midrule
+\textbf{Environment} &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textit{Parzialmente osservabile}: l'agente vede solo ci\`o che inquadra la telecamera
+    \item \textit{Stocastico}: variabilit\`a nelle condizioni di illuminazione, occlusioni, pose
+    \item \textit{Sequenziale}: le decisioni su frame precedenti non influenzano i successivi (stateless)
+    \item \textit{Dinamico}: i soggetti (cani) si muovono nell'inquadratura
+    \item \textit{Continuo}: stream video con frame continui
+    \item \textit{Multi-agente}: sistema di telecamere multiple operanti in parallelo
+\end{itemize} \\
+\midrule
+\textbf{Actuators} &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textit{Sistema di alert}: notifiche real-time per detection con Stray Index $\geq 0.3$
+    \item \textit{Classificazione}: output categorico (Padronale/Possibile Smarrito/Probabile Randagio)
+    \item \textit{Visualizzazione}: bounding box colorate, overlay informativi sulla GUI
+    \item \textit{Logging}: registrazione eventi per analisi successive
+\end{itemize} \\
+\midrule
+\textbf{Sensors} &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textit{Telecamere CCTV}: acquisizione video RGB a risoluzione variabile
+    \item \textit{Frame digitali}: immagini estratte dal flusso video (0.5-2 FPS per analisi)
+    \item \textit{Metadati}: timestamp, identificativo telecamera, coordinate geografiche
+\end{itemize} \\
+\bottomrule
+\end{tabular}
+\caption{Specifica PEAS del sistema ResQPet}
+\label{tab:peas}
+\end{table}
+
+\paragraph{Tipologia di Agente.} ResQPet implementa un \textbf{agente reattivo basato su modello} con componenti di apprendimento. L'architettura ensemble combina quattro classificatori pre-addestrati che operano in parallelo su ogni frame, senza mantenere stato tra osservazioni successive. La decisione finale (Stray Index) \`e una funzione deterministica degli output dei singoli modelli, pesati secondo la formula di fusione descritta nella Sezione~\ref{sec:fusion}.
+
 % ============================================
 % SEZIONE 2: LAVORI CORRELATI
 % ============================================
